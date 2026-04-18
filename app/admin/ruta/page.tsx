@@ -52,12 +52,13 @@ type Vista  = 'lista' | 'mapa'
 export default function AdminRuta() {
   const supabase = useMemo(() => crearClienteBrowser(), [])
 
-  const [pedidos, setPedidos]   = useState<PedidoRuta[]>([])
-  const [ruta, setRuta]         = useState<PedidoRuta[]>([])
-  const [inicio, setInicio]     = useState<Punto | null>(null)
-  const [cargando, setCargando] = useState(true)
-  const [filtro, setFiltro]     = useState<Filtro>('hoy')
-  const [vista, setVista]       = useState<Vista>('mapa')
+  const [pedidos, setPedidos]         = useState<PedidoRuta[]>([])
+  const [ventasRuta, setVentasRuta]   = useState<{ id: string; nombre_cliente: string; direccion: string; lat: number | null; lng: number | null; cantidad: number; total: number; created_at: string }[]>([])
+  const [ruta, setRuta]               = useState<PedidoRuta[]>([])
+  const [inicio, setInicio]           = useState<Punto | null>(null)
+  const [cargando, setCargando]       = useState(true)
+  const [filtro, setFiltro]           = useState<Filtro>('hoy')
+  const [vista, setVista]             = useState<Vista>('mapa')
 
   useEffect(() => {
     async function cargar() {
@@ -75,23 +76,31 @@ export default function AdminRuta() {
       if (filtro === 'semana') desde.setDate(desde.getDate() - 7)
       if (filtro === 'mes')    desde.setDate(desde.getDate() - 30)
 
-      const { data } = await supabase
-        .from('pedidos')
-        .select('id, cantidad, total, estado, created_at, clientes(nombre, direccion, lat, lng)')
-        .neq('estado', 'cancelado')
-        .gte('created_at', desde.toISOString())
-        .order('created_at', { ascending: true })
+      const [{ data: peds }, { data: ventas }] = await Promise.all([
+        supabase
+          .from('pedidos')
+          .select('id, cantidad, total, estado, created_at, clientes(nombre, direccion, lat, lng)')
+          .neq('estado', 'cancelado')
+          .gte('created_at', desde.toISOString())
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('ventas_ruta')
+          .select('id, nombre_cliente, direccion, lat, lng, cantidad, total, created_at')
+          .gte('created_at', desde.toISOString())
+          .order('created_at', { ascending: true }),
+      ])
 
-      setPedidos((data as unknown as PedidoRuta[]) ?? [])
+      setPedidos((peds as unknown as PedidoRuta[]) ?? [])
+      setVentasRuta(ventas ?? [])
       setCargando(false)
     }
     cargar()
   }, [supabase, filtro])
 
-  // Convertir pedidos a puntos del mapa
+  // Combinar pedidos y ventas_ruta en puntos del mapa
   const puntosMapa = useMemo<PuntoMapa[]>(() => {
-    const lista = ruta.length > 0 ? ruta : pedidos
-    return lista
+    const listaPedidos = ruta.length > 0 ? ruta : pedidos
+    const puntoPedidos: PuntoMapa[] = listaPedidos
       .filter(p => p.clientes?.lat && p.clientes?.lng)
       .map(p => ({
         lat:      p.clientes!.lat!,
@@ -101,18 +110,39 @@ export default function AdminRuta() {
         cantidad: p.cantidad,
         hora:     new Date(p.created_at).getHours(),
         fecha:    p.created_at,
+        tipo:     'pedido' as const,
       }))
-  }, [pedidos, ruta])
+
+    const puntoVentas: PuntoMapa[] = ventasRuta
+      .filter(v => v.lat && v.lng)
+      .map(v => ({
+        lat:      v.lat!,
+        lng:      v.lng!,
+        nombre:   v.nombre_cliente,
+        direccion: v.direccion,
+        cantidad: v.cantidad,
+        hora:     new Date(v.created_at).getHours(),
+        fecha:    v.created_at,
+        tipo:     'venta_ruta' as const,
+      }))
+
+    return [...puntoPedidos, ...puntoVentas]
+  }, [pedidos, ruta, ventasRuta])
 
   const totalGarrafones = pedidos.reduce((s, p) => s + p.cantidad, 0)
+                        + ventasRuta.reduce((s, v) => s + v.cantidad, 0)
   const totalIngresos   = pedidos.reduce((s, p) => s + Number(p.total), 0)
+                        + ventasRuta.reduce((s, v) => s + Number(v.total), 0)
   const sinUbicacion    = pedidos.filter(p => !p.clientes?.lat).length
+                        + ventasRuta.filter(v => !v.lat).length
   const listaMostrada   = ruta.length > 0 ? ruta : pedidos
 
   return (
     <div className="max-w-3xl">
       <h1 className="text-xl font-bold text-gray-800 mb-1">Análisis de ruta</h1>
-      <p className="text-sm text-gray-500 mb-4">Visualización de zonas y horarios de compra</p>
+      <p className="text-sm text-gray-500 mb-4">
+        Pedidos WhatsApp/admin + ventas en ruta — {pedidos.length + ventasRuta.length} registros totales
+      </p>
 
       {/* Filtro período */}
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -152,8 +182,8 @@ export default function AdminRuta() {
       {/* Tarjetas resumen */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-          <p className="text-2xl font-bold text-sky-600">{pedidos.length}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Pedidos</p>
+          <p className="text-2xl font-bold text-sky-600">{pedidos.length + ventasRuta.length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Ventas totales</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
           <p className="text-2xl font-bold text-green-600">{totalGarrafones}</p>

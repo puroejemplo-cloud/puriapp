@@ -10,6 +10,7 @@ export type PuntoMapa = {
   cantidad: number
   hora:     number   // 0–23
   fecha:    string
+  tipo:     'pedido' | 'venta_ruta'
 }
 
 // Colores según franja horaria
@@ -80,11 +81,12 @@ export default function MapaVentas({ puntos, centro }: Props) {
 
       // Círculos de ventas
       puntos.forEach(p => {
-        const color  = colorHora(p.hora)
-        const radio  = 6 + p.cantidad * 2   // más garrafones = círculo más grande
+        const color  = p.tipo === 'venta_ruta' ? '#10b981' : colorHora(p.hora)
+        const radio  = 6 + p.cantidad * 2
         const etiq   = etiquetaHora(p.hora)
         const hora12 = p.hora % 12 || 12
         const ampm   = p.hora < 12 ? 'AM' : 'PM'
+        const badge  = p.tipo === 'venta_ruta' ? '🛣️ Venta en ruta' : '📦 Pedido'
 
         L.circleMarker([p.lat, p.lng], {
           radius: radio, color, fillColor: color,
@@ -92,7 +94,8 @@ export default function MapaVentas({ puntos, centro }: Props) {
         })
           .bindPopup(`
             <div style="font-size:13px;line-height:1.5">
-              <b>${p.nombre}</b><br>
+              <b>${p.nombre}</b>
+              <span style="font-size:11px;color:#6b7280;margin-left:4px">${badge}</span><br>
               📍 ${p.direccion}<br>
               🫙 ${p.cantidad} garrafón${p.cantidad > 1 ? 'es' : ''}<br>
               🕐 ${hora12}:00 ${ampm} — ${etiq}<br>
@@ -135,6 +138,7 @@ export default function MapaVentas({ puntos, centro }: Props) {
           { color: '#f97316', label: 'Tarde (12–17 h)' },
           { color: '#3b82f6', label: 'Noche (17–21 h)' },
           { color: '#8b5cf6', label: 'Madrugada' },
+          { color: '#10b981', label: 'Venta en ruta 🛣️' },
         ].map(item => (
           <div key={item.label} className="flex items-center gap-1.5 text-xs text-gray-600">
             <span
