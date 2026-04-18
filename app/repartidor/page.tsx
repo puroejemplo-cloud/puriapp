@@ -158,6 +158,7 @@ export default function RepartidorPage() {
   useEffect(() => {
     if (!repartidor) return
     montatoRef.current = true
+    const repId = repartidor.id
 
     function suscribir() {
       if (!montatoRef.current || reconectandoRef.current) return
@@ -181,7 +182,7 @@ export default function RepartidorPage() {
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'ventas_ruta' },
-          async () => { await cargarVentasHoy(repartidor.id) }
+          async () => { await cargarVentasHoy(repId) }
         )
         .subscribe(status => {
           if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && montatoRef.current) {
