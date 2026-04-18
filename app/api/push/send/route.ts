@@ -5,6 +5,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  try {
   const webpush = (await import('web-push')).default
   const supabase = getSupabaseAdmin()
 
@@ -56,4 +57,8 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, enviados: suscripciones.length - muertos.length })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+  }
 }
