@@ -286,14 +286,12 @@ export default function AdminPedidos() {
                     ))}
                   </select>
                 )}
-                {p.estado === 'en_ruta' && (
-                  <button
-                    onClick={() => cambiarEstado(p.id, 'entregado')}
-                    className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg"
-                  >
-                    Marcar entregado
-                  </button>
-                )}
+                <button
+                  onClick={() => cambiarEstado(p.id, 'entregado')}
+                  className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg"
+                >
+                  Marcar entregado
+                </button>
                 <button
                   onClick={() => cambiarEstado(p.id, 'cancelado')}
                   className="text-xs bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg"
