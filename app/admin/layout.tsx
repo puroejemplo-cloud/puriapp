@@ -11,7 +11,8 @@ const NAV = [
   { href: '/admin/clientes',     label: '👥 Clientes'      },
   { href: '/admin/ventas-ruta',  label: '🛣️ Ventas ruta'  },
   { href: '/admin/repartidores',   label: '🚚 Repartidores'  },
-  { href: '/admin/ruta',           label: '🗺 Ruta'           },
+  { href: '/admin/ruta',            label: '🗺 Ruta'           },
+  { href: '/admin/contabilidad',   label: '💰 Contabilidad'   },
   { href: '/admin/configuracion',  label: '⚙️ Config'        },
 ]
 
