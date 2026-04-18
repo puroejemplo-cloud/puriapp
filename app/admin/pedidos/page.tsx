@@ -63,11 +63,14 @@ export default function AdminPedidos() {
   const [filtro, setFiltro]             = useState<Filtro>('todos')
   const [cargando, setCargando]         = useState(true)
 
-  const [modalAbierto, setModalAbierto] = useState(false)
-  const [form, setForm]                 = useState<NuevoPedidoForm>(FORM_VACIO)
-  const [guardando, setGuardando]       = useState(false)
-  const [errorForm, setErrorForm]       = useState('')
-  const [urlValida, setUrlValida]       = useState<boolean | null>(null)
+  const [modalAbierto, setModalAbierto]       = useState(false)
+  const [form, setForm]                       = useState<NuevoPedidoForm>(FORM_VACIO)
+  const [guardando, setGuardando]             = useState(false)
+  const [errorForm, setErrorForm]             = useState('')
+  const [urlValida, setUrlValida]             = useState<boolean | null>(null)
+  const [precioPedido, setPrecioPedido]       = useState(35)
+  const [buscandoCliente, setBuscandoCliente] = useState(false)
+  const [clienteEncontrado, setClienteEncontrado] = useState<boolean | null>(null)
 
   async function cargar() {
     let q = supabase
@@ -93,6 +96,18 @@ export default function AdminPedidos() {
           setForm(f => ({ ...f, repartidorId: lista[0].id }))
         }
       })
+
+    // Cargar precio real desde configuracion
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return
+      const res = await fetch('/api/admin/configuracion', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) return
+      const rows: { clave: string; valor: Record<string, number> }[] = await res.json()
+      const precio = rows.find(r => r.clave === 'precios')?.valor?.pedido
+      if (precio) setPrecioPedido(precio)
+    })
   }, [supabase])
 
   useEffect(() => {
@@ -128,8 +143,30 @@ export default function AdminPedidos() {
     setModalAbierto(true)
     setErrorForm('')
     setUrlValida(null)
+    setClienteEncontrado(null)
     // Preservar repartidor por default si ya hay uno seleccionado
     setForm(f => ({ ...FORM_VACIO, repartidorId: f.repartidorId }))
+  }
+
+  async function buscarClientePorTelefono(telRaw: string) {
+    if (!telRaw.trim()) { setClienteEncontrado(null); return }
+    let tel = telRaw.trim().replace(/\s/g, '')
+    if (!tel.startsWith('+')) tel = '+52' + tel.replace(/^52/, '')
+
+    setBuscandoCliente(true)
+    const { data } = await supabase
+      .from('clientes')
+      .select('nombre, direccion')
+      .eq('telefono', tel)
+      .maybeSingle()
+    setBuscandoCliente(false)
+
+    if (data) {
+      setClienteEncontrado(true)
+      setForm(f => ({ ...f, nombre: data.nombre ?? '', direccion: data.direccion ?? '' }))
+    } else {
+      setClienteEncontrado(false)
+    }
   }
 
   async function crearPedido() {
@@ -291,6 +328,27 @@ export default function AdminPedidos() {
                 </select>
               </div>
 
+              {/* Teléfono — llave primaria del cliente */}
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Teléfono *</label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    placeholder="5512345678"
+                    value={form.telefono}
+                    onChange={e => { setField('telefono', e.target.value); setClienteEncontrado(null) }}
+                    onBlur={e => buscarClientePorTelefono(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 pr-8"
+                  />
+                  {buscandoCliente && (
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">…</span>
+                  )}
+                </div>
+                {clienteEncontrado === true  && <p className="text-xs text-green-600 mt-0.5">✓ Cliente encontrado — datos cargados</p>}
+                {clienteEncontrado === false && <p className="text-xs text-gray-400 mt-0.5">Cliente nuevo — completa los datos</p>}
+                {clienteEncontrado === null  && <p className="text-xs text-gray-400 mt-0.5">Se agrega +52 si no incluyes código de país</p>}
+              </div>
+
               {/* Nombre */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Nombre del cliente *</label>
@@ -301,19 +359,6 @@ export default function AdminPedidos() {
                   onChange={e => setField('nombre', e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
-              </div>
-
-              {/* Teléfono */}
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Teléfono *</label>
-                <input
-                  type="tel"
-                  placeholder="5512345678"
-                  value={form.telefono}
-                  onChange={e => setField('telefono', e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                />
-                <p className="text-xs text-gray-400 mt-0.5">Se agrega +52 si no incluyes código de país</p>
               </div>
 
               {/* Dirección */}
@@ -367,7 +412,7 @@ export default function AdminPedidos() {
                   >
                     +
                   </button>
-                  <span className="text-sm text-gray-500">× $35 = <strong>${form.cantidad * 35}</strong></span>
+                  <span className="text-sm text-gray-500">× ${precioPedido} = <strong>${form.cantidad * precioPedido}</strong></span>
                 </div>
               </div>
 
