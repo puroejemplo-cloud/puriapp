@@ -96,25 +96,29 @@ export default function RepartidorPage() {
     let activo = true
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession()
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
 
-      if (!activo) return
-      if (!session) { router.replace('/login'); return }
+        if (!activo) return
+        if (!session) { router.replace('/login'); return }
 
-      const { data: rep } = await supabase
-        .from('repartidores')
-        .select('id, nombre')
-        .eq('user_id', session.user.id)
-        .eq('activo', true)
-        .maybeSingle()
+        const { data: rep } = await supabase
+          .from('repartidores')
+          .select('id, nombre')
+          .eq('user_id', session.user.id)
+          .eq('activo', true)
+          .maybeSingle()
 
-      if (!activo) return
-      if (!rep) { router.replace('/login'); return }
+        if (!activo) return
+        if (!rep) { router.replace('/login'); return }
 
-      setRepartidor(rep)
-      await Promise.all([cargarPedidos(), cargarVentasHoy(rep.id)])
-      setPushActivado(yaEstaActivado())
-      setCargando(false)
+        setRepartidor(rep)
+        await Promise.all([cargarPedidos(), cargarVentasHoy(rep.id)])
+        setPushActivado(yaEstaActivado())
+        setCargando(false)
+      } catch {
+        if (activo) router.replace('/login')
+      }
     }
 
     init()

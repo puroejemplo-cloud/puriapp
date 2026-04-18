@@ -29,6 +29,7 @@ export async function activarPush(repartidorId: string): Promise<boolean> {
 
 export function yaEstaActivado(): boolean {
   if (typeof window === 'undefined') return false
+  if (!('Notification' in window)) return false
   return Notification.permission === 'granted'
 }
 
