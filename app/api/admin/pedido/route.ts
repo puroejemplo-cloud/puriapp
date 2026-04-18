@@ -35,7 +35,14 @@ export async function POST(request: NextRequest) {
     let coordsLat = lat ?? null
     let coordsLng = lng ?? null
     if (!coordsLat || !coordsLng) {
-      const coords = await geocodificar(direccion)
+      // Leer zona configurada para limitar búsqueda
+      const { data: cfgRow } = await supabase
+        .from('configuracion')
+        .select('valor')
+        .eq('clave', 'geocoding_zona')
+        .maybeSingle()
+      const zona = cfgRow?.valor ?? null
+      const coords = await geocodificar(direccion, zona)
       coordsLat = coords?.lat ?? null
       coordsLng = coords?.lng ?? null
     }

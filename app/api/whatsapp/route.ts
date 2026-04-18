@@ -100,7 +100,9 @@ export async function POST(request: NextRequest) {
           respuesta = `¡Hola ${cliente.nombre}! Ya estás registrado. Si quieres actualizar tu dirección escríbenos directamente.`
           break
         }
-        const coords = await geocodificar(comando.direccion!)
+        const { data: cfgRow } = await supabaseAdmin
+          .from('configuracion').select('valor').eq('clave', 'geocoding_zona').maybeSingle()
+        const coords = await geocodificar(comando.direccion!, cfgRow?.valor ?? null)
         const { data: nuevo, error } = await supabaseAdmin
           .from('clientes')
           .insert({
