@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { crearClienteBrowser } from '@/lib/supabase-browser'
 import { distanciaKm } from '@/lib/distancia'
 import VentaRutaModal from '@/components/VentaRutaModal'
+import { activarPush, yaEstaActivado } from '@/lib/push'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -50,6 +51,10 @@ export default function RepartidorPage() {
   // FASE 5: ventas en ruta
   const [modalVentaAbierto, setModalVentaAbierto] = useState(false)
   const [ventasHoy, setVentasHoy] = useState<VentasHoy>({ garrafones: 0, total: 0 })
+
+  // FASE 8: notificaciones push
+  const [pushActivado, setPushActivado] = useState(false)
+  const [activandoPush, setActivandoPush] = useState(false)
 
   const canalRef = useRef<RealtimeChannel | null>(null)
 
@@ -108,6 +113,7 @@ export default function RepartidorPage() {
 
       setRepartidor(rep)
       await Promise.all([cargarPedidos(), cargarVentasHoy(rep.id)])
+      setPushActivado(yaEstaActivado())
       setCargando(false)
     }
 
@@ -214,6 +220,14 @@ export default function RepartidorPage() {
     router.replace('/login')
   }
 
+  async function handleActivarPush() {
+    if (!repartidor) return
+    setActivandoPush(true)
+    const ok = await activarPush(repartidor.id)
+    setPushActivado(ok)
+    setActivandoPush(false)
+  }
+
   // ── Pantalla de carga ─────────────────────────────────────────────────
   if (cargando) {
     return (
@@ -241,6 +255,15 @@ export default function RepartidorPage() {
             }`}>
               {gps ? '📍 GPS activo' : '📍 Sin GPS'}
             </span>
+            {!pushActivado && (
+              <button
+                onClick={handleActivarPush}
+                disabled={activandoPush}
+                className="text-xs bg-yellow-400 text-gray-900 px-2 py-0.5 rounded-full font-medium disabled:opacity-50"
+              >
+                {activandoPush ? '...' : '🔔 Activar'}
+              </button>
+            )}
             <button onClick={cerrarSesion} className="text-sky-200 text-xs underline ml-1">
               Salir
             </button>

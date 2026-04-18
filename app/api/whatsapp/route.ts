@@ -173,6 +173,17 @@ export async function POST(request: NextRequest) {
             `✅ Pedido recibido:\n` +
             `🫙 ${cantidad} garrafón${cantidad > 1 ? 'es' : ''} × $${precio} = *$${total}*\n\n` +
             `Te avisaremos cuando el repartidor esté en camino 🚚`
+
+          // Notificar a todos los repartidores activos
+          fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/push/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              titulo: '🫙 Nuevo pedido',
+              cuerpo: `${cliente!.nombre} — ${cantidad} garrafón${cantidad > 1 ? 'es' : ''}`,
+              url: '/repartidor',
+            }),
+          }).catch(() => {})
         }
         break
       }
