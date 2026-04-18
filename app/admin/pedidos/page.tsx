@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { crearClienteBrowser } from '@/lib/supabase-browser'
+import { distanciaKm } from '@/lib/distancia'
 
 type Repartidor = { id: string; nombre: string }
 
@@ -12,8 +13,8 @@ type Pedido = {
   total:         number
   notas:         string | null
   created_at:    string
-  clientes:      { nombre: string; telefono: string; direccion: string } | null
-  repartidores:  { nombre: string } | null
+  clientes:      { nombre: string; telefono: string; direccion: string; lat: number | null; lng: number | null } | null
+  repartidores:  { nombre: string; lat: number | null; lng: number | null } | null
 }
 
 type NuevoPedidoForm = {
@@ -75,7 +76,7 @@ export default function AdminPedidos() {
   async function cargar() {
     let q = supabase
       .from('pedidos')
-      .select('id, estado, cantidad, total, notas, created_at, clientes(nombre,telefono,direccion), repartidores(nombre)')
+      .select('id, estado, cantidad, total, notas, created_at, clientes(nombre,telefono,direccion,lat,lng), repartidores(nombre,lat,lng)')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -263,7 +264,14 @@ export default function AdminPedidos() {
                 </p>
                 <p className="text-xs text-gray-400 truncate">{p.clientes?.direccion}</p>
                 {p.repartidores && (
-                  <p className="text-xs text-gray-500 mt-0.5">🚚 {p.repartidores.nombre}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    🚚 {p.repartidores.nombre}
+                    {p.repartidores.lat && p.clientes?.lat && (
+                      <span className="ml-1.5 text-sky-500 font-medium">
+                        · {distanciaKm(p.repartidores.lat, p.repartidores.lng!, p.clientes.lat, p.clientes.lng!).toFixed(1)} km
+                      </span>
+                    )}
+                  </p>
                 )}
                 {p.notas && <p className="text-xs text-gray-400 mt-0.5 italic">{p.notas}</p>}
                 <p className="text-xs text-gray-300 mt-1">

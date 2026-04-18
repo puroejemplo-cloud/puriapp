@@ -154,6 +154,21 @@ export default function RepartidorPage() {
     return () => navigator.geolocation.clearWatch(id)
   }, [])
 
+  // ── Guardar ubicación en BD cada 30s para que admin vea distancia ──────
+  useEffect(() => {
+    if (!repartidor || !gps) return
+    const guardar = () => {
+      supabase
+        .from('repartidores')
+        .update({ lat: gps.lat, lng: gps.lng, ultima_ubicacion: new Date().toISOString() })
+        .eq('id', repartidor.id)
+        .then(() => {})
+    }
+    guardar()
+    const timer = setInterval(guardar, 30_000)
+    return () => clearInterval(timer)
+  }, [repartidor, gps, supabase])
+
   // ── Realtime con reconexión automática ───────────────────────────────
   useEffect(() => {
     if (!repartidor) return
