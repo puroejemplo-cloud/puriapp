@@ -53,21 +53,18 @@ export default function AdminConfiguracion() {
   async function guardarConfig(clave: string, valor: unknown, setGuardando: (v: boolean) => void, setMensaje: (v: string) => void) {
     setGuardando(true); setMensaje('')
 
-    // Buscar fila existente (RLS filtra automáticamente por purificadora)
-    const { data: existente } = await supabase
-      .from('configuracion').select('id').eq('clave', clave).maybeSingle()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token ?? ''
 
-    let err
-    if (existente?.id) {
-      ;({ error: err } = await supabase.from('configuracion')
-        .update({ valor }).eq('id', existente.id))
-    } else {
-      ;({ error: err } = await supabase.from('configuracion')
-        .insert({ clave, valor, purificadora_id: purificadoraId }))
-    }
+    const res = await fetch('/api/admin/configuracion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ clave, valor }),
+    })
+    const json = await res.json()
 
     setGuardando(false)
-    setMensaje(err ? `⚠️ Error: ${err.message}` : '✅ Guardado correctamente')
+    setMensaje(json.ok ? '✅ Guardado correctamente' : `⚠️ Error: ${json.error}`)
   }
 
   async function guardarZona() {
