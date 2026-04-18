@@ -25,6 +25,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     async function verificar() {
+      // Refrescar JWT para garantizar metadata actualizada
+      await supabase.auth.refreshSession().catch(() => {})
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || user.user_metadata?.role !== 'admin') {
         router.replace('/login')
@@ -34,6 +36,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setVerificando(false)
     }
     verificar()
+
+    // Mantener JWT fresco mientras el admin está en el panel
+    const jwtTimer = setInterval(() => {
+      supabase.auth.refreshSession().catch(() => {})
+    }, 50 * 60 * 1000)
+
+    return () => clearInterval(jwtTimer)
   }, [supabase, router])
 
   async function salir() {

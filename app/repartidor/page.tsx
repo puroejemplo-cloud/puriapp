@@ -56,7 +56,9 @@ export default function RepartidorPage() {
   const [pushActivado, setPushActivado] = useState(false)
   const [activandoPush, setActivandoPush] = useState(false)
 
-  const canalRef = useRef<RealtimeChannel | null>(null)
+  const canalRef        = useRef<RealtimeChannel | null>(null)
+  const reconectandoRef = useRef(false)
+  const montatoRef      = useRef(true)
 
   // ── Cargar pedidos activos ─────────────────────────────────────────────
   const cargarPedidos = useCallback(async () => {
@@ -152,40 +154,58 @@ export default function RepartidorPage() {
     return () => navigator.geolocation.clearWatch(id)
   }, [])
 
-  // ── Realtime: pedidos + ventas_ruta ───────────────────────────────────
+  // ── Realtime con reconexión automática ───────────────────────────────
   useEffect(() => {
     if (!repartidor) return
+    montatoRef.current = true
 
-    canalRef.current = supabase
-      .channel('cambios-ruta')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'pedidos' },
-        async payload => {
-          await cargarPedidos()
+    function suscribir() {
+      if (!montatoRef.current || reconectandoRef.current) return
+      canalRef.current?.unsubscribe()
 
-          if (payload.eventType === 'INSERT') {
-            navigator.vibrate?.([300, 150, 300])
-            setNuevoPedidoId((payload.new as Pedido).id)
-            setTimeout(() => setNuevoPedidoId(null), 4000)
-
-            try {
-              const audio = new Audio('/notif.mp3')
-              await audio.play()
-            } catch { /* archivo opcional */ }
+      canalRef.current = supabase
+        .channel(`cambios-ruta-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'pedidos' },
+          async payload => {
+            await cargarPedidos()
+            if (payload.eventType === 'INSERT') {
+              navigator.vibrate?.([300, 150, 300])
+              setNuevoPedidoId((payload.new as Pedido).id)
+              setTimeout(() => setNuevoPedidoId(null), 4000)
+              try { await new Audio('/notif.mp3').play() } catch { /* opcional */ }
+            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'ventas_ruta' },
-        async () => {
-          await cargarVentasHoy(repartidor.id)
-        }
-      )
-      .subscribe()
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'ventas_ruta' },
+          async () => { await cargarVentasHoy(repartidor.id) }
+        )
+        .subscribe(status => {
+          if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && montatoRef.current) {
+            reconectandoRef.current = true
+            setTimeout(() => {
+              reconectandoRef.current = false
+              suscribir()
+            }, 4000)
+          }
+        })
+    }
 
-    return () => { canalRef.current?.unsubscribe() }
+    suscribir()
+
+    // Refrescar JWT cada 50 min para mantener sesión y metadata actualizados
+    const jwtTimer = setInterval(() => {
+      supabase.auth.refreshSession().catch(() => {})
+    }, 50 * 60 * 1000)
+
+    return () => {
+      montatoRef.current = false
+      canalRef.current?.unsubscribe()
+      clearInterval(jwtTimer)
+    }
   }, [repartidor, supabase, cargarPedidos, cargarVentasHoy])
 
   // ── Ordenar pedidos: en_ruta primero, luego por distancia ─────────────
