@@ -16,6 +16,14 @@ type Pedido = {
   repartidores:  { nombre: string } | null
 }
 
+type NuevoPedidoForm = {
+  nombre:    string
+  telefono:  string
+  direccion: string
+  cantidad:  number
+  notas:     string
+}
+
 const ESTADOS = ['todos', 'pendiente', 'en_ruta', 'entregado', 'cancelado'] as const
 type Filtro = typeof ESTADOS[number]
 
@@ -29,12 +37,20 @@ const COLOR_ESTADO: Record<string, string> = {
   cancelado: 'bg-gray-100 text-gray-500',
 }
 
+const FORM_VACIO: NuevoPedidoForm = { nombre: '', telefono: '', direccion: '', cantidad: 1, notas: '' }
+
 export default function AdminPedidos() {
   const supabase      = useMemo(() => crearClienteBrowser(), [])
   const [pedidos, setPedidos]           = useState<Pedido[]>([])
   const [repartidores, setRepartidores] = useState<Repartidor[]>([])
   const [filtro, setFiltro]             = useState<Filtro>('todos')
   const [cargando, setCargando]         = useState(true)
+
+  // Modal nuevo pedido
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const [form, setForm]                 = useState<NuevoPedidoForm>(FORM_VACIO)
+  const [guardando, setGuardando]       = useState(false)
+  const [errorForm, setErrorForm]       = useState('')
 
   async function cargar() {
     let q = supabase
@@ -62,6 +78,7 @@ export default function AdminPedidos() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, cargar)
       .subscribe()
     return () => { supabase.removeChannel(canal) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, filtro])
 
   async function cambiarEstado(id: string, estado: string) {
@@ -73,9 +90,57 @@ export default function AdminPedidos() {
     await supabase.from('pedidos').update({ repartidor_id: repartidorId, estado: 'en_ruta' }).eq('id', id)
   }
 
+  function setField<K extends keyof NuevoPedidoForm>(k: K, v: NuevoPedidoForm[K]) {
+    setForm(f => ({ ...f, [k]: v }))
+  }
+
+  async function crearPedido() {
+    setErrorForm('')
+    if (!form.nombre.trim())    return setErrorForm('El nombre es requerido')
+    if (!form.telefono.trim())  return setErrorForm('El teléfono es requerido')
+    if (!form.direccion.trim()) return setErrorForm('La dirección es requerida')
+    if (form.cantidad < 1)      return setErrorForm('La cantidad debe ser al menos 1')
+
+    // Formatear teléfono con +52 si no tiene código de país
+    let tel = form.telefono.trim().replace(/\s/g, '')
+    if (!tel.startsWith('+')) tel = '+52' + tel.replace(/^52/, '')
+
+    setGuardando(true)
+    const res = await fetch('/api/admin/pedido', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre:   form.nombre.trim(),
+        telefono: tel,
+        direccion: form.direccion.trim(),
+        cantidad:  form.cantidad,
+        notas:     form.notas.trim() || null,
+      }),
+    })
+
+    const json = await res.json()
+    setGuardando(false)
+
+    if (!res.ok) {
+      setErrorForm(json.error ?? 'Error al crear el pedido')
+      return
+    }
+
+    setModalAbierto(false)
+    setForm(FORM_VACIO)
+  }
+
   return (
     <div>
-      <h1 className="text-xl font-bold text-gray-800 mb-4">Pedidos</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold text-gray-800">Pedidos</h1>
+        <button
+          onClick={() => { setModalAbierto(true); setForm(FORM_VACIO); setErrorForm('') }}
+          className="bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
+        >
+          + Nuevo pedido
+        </button>
+      </div>
 
       {/* Filtros de estado */}
       <div className="flex gap-2 flex-wrap mb-4">
@@ -160,6 +225,103 @@ export default function AdminPedidos() {
           </div>
         ))}
       </div>
+
+      {/* Modal nuevo pedido */}
+      {modalAbierto && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Nuevo pedido</h2>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Nombre del cliente *</label>
+                <input
+                  type="text"
+                  placeholder="Juan Pérez"
+                  value={form.nombre}
+                  onChange={e => setField('nombre', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Teléfono *</label>
+                <input
+                  type="tel"
+                  placeholder="5512345678"
+                  value={form.telefono}
+                  onChange={e => setField('telefono', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                />
+                <p className="text-xs text-gray-400 mt-0.5">Se agregará +52 si no incluyes código de país</p>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Dirección *</label>
+                <input
+                  type="text"
+                  placeholder="Calle Agua 123, Col. Centro"
+                  value={form.direccion}
+                  onChange={e => setField('direccion', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                />
+                <p className="text-xs text-gray-400 mt-0.5">Se geocodifica automáticamente para el mapa</p>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Garrafones *</label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setField('cantidad', Math.max(1, form.cantidad - 1))}
+                    className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 text-xl font-bold text-gray-600 flex items-center justify-center"
+                  >
+                    −
+                  </button>
+                  <span className="text-2xl font-bold text-sky-600 w-10 text-center">{form.cantidad}</span>
+                  <button
+                    onClick={() => setField('cantidad', form.cantidad + 1)}
+                    className="w-10 h-10 rounded-full bg-sky-100 hover:bg-sky-200 text-xl font-bold text-sky-600 flex items-center justify-center"
+                  >
+                    +
+                  </button>
+                  <span className="text-sm text-gray-500">× $35 = <strong>${form.cantidad * 35}</strong></span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Notas (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Casa blanca, portón azul..."
+                  value={form.notas}
+                  onChange={e => setField('notas', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                />
+              </div>
+
+              {errorForm && (
+                <p className="text-sm text-red-500 bg-red-50 rounded-xl px-3 py-2">{errorForm}</p>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setModalAbierto(false)}
+                className="flex-1 border-2 border-gray-200 hover:bg-gray-50 py-2.5 rounded-xl text-gray-600 font-semibold text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={crearPedido}
+                disabled={guardando}
+                className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white py-2.5 rounded-xl font-bold text-sm"
+              >
+                {guardando ? 'Creando...' : 'Crear pedido'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
