@@ -6,6 +6,8 @@ export type TipoComando =
   | 'CANCELAR'
   | 'AYUDA'
   | 'REGISTRO'
+  | 'CONFIRMAR'
+  | 'RECHAZAR'
   | 'DESCONOCIDO'
 
 export interface ComandoParsed {
@@ -40,6 +42,12 @@ export function parsearComando(mensaje: string): ComandoParsed {
   if (texto === 'CANCELAR') return { tipo: 'CANCELAR' }
   if (texto === 'HOLA' || texto === 'AYUDA' || texto === 'MENU' || texto === 'MENÚ') {
     return { tipo: 'AYUDA' }
+  }
+  if (texto === 'SÍ' || texto === 'SI' || texto === 'S' || texto === 'YES') {
+    return { tipo: 'CONFIRMAR' }
+  }
+  if (texto === 'NO' || texto === 'N') {
+    return { tipo: 'RECHAZAR' }
   }
 
   return { tipo: 'DESCONOCIDO' }

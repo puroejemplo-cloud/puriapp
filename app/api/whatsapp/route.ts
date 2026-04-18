@@ -8,21 +8,19 @@ import { geocodificar } from '@/lib/geocoding'
 export async function POST(request: NextRequest) {
   const formData = await request.formData()
 
-  // El número viene como "whatsapp:+521551234567" — quitamos el prefijo
   const telefono = (formData.get('From') as string ?? '').replace('whatsapp:', '')
   const cuerpo   = (formData.get('Body') as string ?? '').trim()
 
-  // --- Log de mensaje entrante ---
-  await supabaseAdmin.from('whatsapp_log').insert({
-    telefono,
-    mensaje: cuerpo,
-    direccion: 'in',
-  })
+  // Twilio envía Latitude y Longitude cuando el cliente comparte su ubicación
+  const latStr = formData.get('Latitude')  as string | null
+  const lngStr = formData.get('Longitude') as string | null
+  const esUbicacion = !!latStr && !!lngStr
 
-  // --- Buscar cliente registrado ---
+  await supabaseAdmin.from('whatsapp_log').insert({ telefono, mensaje: cuerpo || '[ubicación]', direccion: 'in' })
+
   const { data: cliente } = await supabaseAdmin
     .from('clientes')
-    .select('id, nombre, garrafones_prestados')
+    .select('id, nombre, lat, lng, lat_pendiente, lng_pendiente, garrafones_prestados')
     .eq('telefono', telefono)
     .eq('activo', true)
     .maybeSingle()
@@ -31,8 +29,52 @@ export async function POST(request: NextRequest) {
   let respuesta = ''
   let pedidoId: string | undefined
 
-  // Si no está registrado y no está intentando registrarse, pedir registro
-  if (!cliente && comando.tipo !== 'REGISTRO') {
+  // ── Flujo: cliente comparte ubicación ────────────────────────────────────
+  if (esUbicacion) {
+    const lat = parseFloat(latStr!)
+    const lng = parseFloat(lngStr!)
+
+    if (!cliente) {
+      // Sin registro: guardamos igual para no perder la ubicación
+      respuesta =
+        `📍 Recibimos tu ubicación, pero aún no estás registrado.\n\n` +
+        `Para registrarte escribe:\n*REGISTRO|Tu Nombre|Tu Dirección*`
+    } else if (!cliente.lat && !cliente.lng) {
+      // Primera vez que comparte ubicación → guardar directo
+      await supabaseAdmin.from('clientes').update({ lat, lng }).eq('id', cliente.id)
+      respuesta = `📍 ¡Ubicación guardada, ${cliente.nombre}! Ahora tus pedidos llegarán más rápido. 🚀`
+    } else {
+      // Ya tiene coords → guardar como pendiente y pedir confirmación
+      await supabaseAdmin.from('clientes')
+        .update({ lat_pendiente: lat, lng_pendiente: lng })
+        .eq('id', cliente.id)
+      respuesta =
+        `📍 Recibimos tu nueva ubicación, ${cliente.nombre}.\n\n` +
+        `¿Quieres actualizar la dirección guardada?\n` +
+        `Responde *SÍ* para actualizarla o *NO* para mantener la anterior.`
+    }
+
+  // ── Flujo: respuesta SÍ/NO a confirmación de ubicación ──────────────────
+  } else if (cliente && (cliente.lat_pendiente || cliente.lng_pendiente) &&
+             (comando.tipo === 'CONFIRMAR' || comando.tipo === 'RECHAZAR')) {
+
+    if (comando.tipo === 'CONFIRMAR') {
+      // Aplicar la ubicación pendiente
+      await supabaseAdmin.from('clientes')
+        .update({ lat: cliente.lat_pendiente, lng: cliente.lng_pendiente,
+                  lat_pendiente: null, lng_pendiente: null })
+        .eq('id', cliente.id)
+      respuesta = `✅ Ubicación actualizada correctamente. ¡Gracias, ${cliente.nombre}!`
+    } else {
+      // Descartar la ubicación pendiente
+      await supabaseAdmin.from('clientes')
+        .update({ lat_pendiente: null, lng_pendiente: null })
+        .eq('id', cliente.id)
+      respuesta = `👍 Conservamos tu dirección anterior. ¡Todo listo!`
+    }
+
+  // ── Flujo normal: comandos de texto ──────────────────────────────────────
+  } else if (!cliente && comando.tipo !== 'REGISTRO') {
     respuesta =
       `No encontramos tu número registrado 😕\n\n` +
       `Para registrarte escribe:\n` +
@@ -41,28 +83,24 @@ export async function POST(request: NextRequest) {
   } else {
     switch (comando.tipo) {
 
-      // ── AYUDA / HOLA ───────────────────────────────────────────
       case 'AYUDA':
         respuesta = MENSAJE_AYUDA
         break
 
-      // ── REGISTRO ───────────────────────────────────────────────
       case 'REGISTRO': {
         if (cliente) {
           respuesta = `¡Hola ${cliente.nombre}! Ya estás registrado. Si quieres actualizar tu dirección escríbenos directamente.`
           break
         }
-
         const coords = await geocodificar(comando.direccion!)
-
         const { data: nuevo, error } = await supabaseAdmin
           .from('clientes')
           .insert({
             telefono,
             nombre:    comando.nombre,
             direccion: comando.direccion,
-            lat:       coords?.lat    ?? null,
-            lng:       coords?.lng    ?? null,
+            lat:       coords?.lat ?? null,
+            lng:       coords?.lng ?? null,
           })
           .select('nombre')
           .single()
@@ -75,14 +113,13 @@ export async function POST(request: NextRequest) {
             (coords
               ? `📍 Ubicación encontrada correctamente.\n\n`
               : `⚠️ No pude ubicar tu dirección en el mapa, pero puedes hacer pedidos igual.\n\n`) +
+            `💡 También puedes compartir tu ubicación directo desde WhatsApp para mayor precisión.\n\n` +
             MENSAJE_AYUDA
         }
         break
       }
 
-      // ── PEDIDO ─────────────────────────────────────────────────
       case 'PEDIDO': {
-        // Verificar que no tenga un pedido pendiente activo
         const { data: pedidoActivo } = await supabaseAdmin
           .from('pedidos')
           .select('id')
@@ -97,7 +134,6 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        // Obtener precio del garrafón desde la tabla productos
         const { data: producto } = await supabaseAdmin
           .from('productos')
           .select('id, precio')
@@ -133,7 +169,6 @@ export async function POST(request: NextRequest) {
         break
       }
 
-      // ── ESTADO ─────────────────────────────────────────────────
       case 'ESTADO': {
         const { data: ultimo } = await supabaseAdmin
           .from('pedidos')
@@ -147,10 +182,10 @@ export async function POST(request: NextRequest) {
           respuesta = `No tienes pedidos registrados aún. Escribe *PEDIDO [cantidad]* para pedir.`
         } else {
           const etiquetas: Record<string, string> = {
-            pendiente:  '⏳ Pendiente — esperando repartidor',
-            en_ruta:    '🚚 En ruta — ya va para allá',
-            entregado:  '✅ Entregado',
-            cancelado:  '❌ Cancelado',
+            pendiente: '⏳ Pendiente — esperando repartidor',
+            en_ruta:   '🚚 En ruta — ya va para allá',
+            entregado: '✅ Entregado',
+            cancelado: '❌ Cancelado',
           }
           respuesta =
             `*Tu último pedido:*\n` +
@@ -160,7 +195,6 @@ export async function POST(request: NextRequest) {
         break
       }
 
-      // ── CANCELAR ───────────────────────────────────────────────
       case 'CANCELAR': {
         const { data: pendiente } = await supabaseAdmin
           .from('pedidos')
@@ -176,27 +210,20 @@ export async function POST(request: NextRequest) {
             .from('pedidos')
             .update({ estado: 'cancelado' })
             .eq('id', pendiente.id)
-
           respuesta = `✅ Pedido de ${pendiente.cantidad} garrafón${pendiente.cantidad > 1 ? 'es' : ''} cancelado.`
         }
         break
       }
 
-      // ── DESCONOCIDO ────────────────────────────────────────────
       default:
         respuesta = `No entendí ese mensaje 😅\n\n${MENSAJE_AYUDA}`
     }
   }
 
-  // --- Log de mensaje saliente ---
   await supabaseAdmin.from('whatsapp_log').insert({
-    telefono,
-    mensaje:   respuesta,
-    direccion: 'out',
-    pedido_id: pedidoId ?? null,
+    telefono, mensaje: respuesta, direccion: 'out', pedido_id: pedidoId ?? null,
   })
 
-  // --- Respuesta TwiML (XML que entiende Twilio) ---
   const twiml = new twilio.twiml.MessagingResponse()
   twiml.message(respuesta)
 
