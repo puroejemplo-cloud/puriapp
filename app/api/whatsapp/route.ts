@@ -1,11 +1,15 @@
 import { type NextRequest } from 'next/server'
 import twilio from 'twilio'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import { parsearComando, MENSAJE_AYUDA } from '@/lib/comandos'
 import { geocodificar } from '@/lib/geocoding'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 // Twilio envía application/x-www-form-urlencoded, no JSON
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = getSupabaseAdmin()
   const formData = await request.formData()
 
   const telefono = (formData.get('From') as string ?? '').replace('whatsapp:', '')
