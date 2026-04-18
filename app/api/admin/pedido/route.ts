@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
     clienteId = nuevo.id
   }
 
-  // Precio del garrafón — leer desde configuracion, fallback a productos
+  // Precio del garrafón — leer desde configuracion filtrado por purificadora
   const [{ data: cfgPrecios }, { data: producto }] = await Promise.all([
-    supabase.from('configuracion').select('valor').eq('clave', 'precios').maybeSingle(),
+    supabase.from('configuracion').select('valor').eq('clave', 'precios').eq('purificadora_id', purificadoraId).maybeSingle(),
     supabase.from('productos').select('id, precio').eq('nombre', 'Garrafón 20L').eq('activo', true).maybeSingle(),
   ])
   const precio = cfgPrecios?.valor?.pedido ?? producto?.precio ?? 35
