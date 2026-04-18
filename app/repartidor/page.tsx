@@ -18,6 +18,7 @@ type Pedido = {
   total: number | null
   notas: string | null
   repartidor_id: string | null
+  orden_ruta: number | null
   created_at: string
   clientes: {
     nombre: string
@@ -63,7 +64,7 @@ export default function RepartidorPage() {
     const { data } = await supabase
       .from('pedidos')
       .select(`
-        id, estado, cantidad, total, notas, repartidor_id, created_at,
+        id, estado, cantidad, total, notas, repartidor_id, orden_ruta, created_at,
         clientes (nombre, direccion, lat, lng, telefono, referencias)
       `)
       .in('estado', ['pendiente', 'en_ruta'])
@@ -179,7 +180,16 @@ export default function RepartidorPage() {
 
   // ── Ordenar pedidos: en_ruta primero, luego por distancia ─────────────
   const pedidosOrdenados = useMemo(() => {
+    const tieneRuta = pedidos.some(p => p.orden_ruta !== null)
+
     return [...pedidos].sort((a, b) => {
+      // Si hay ruta generada, respetar ese orden
+      if (tieneRuta) {
+        const oa = a.orden_ruta ?? 9999
+        const ob = b.orden_ruta ?? 9999
+        return oa - ob
+      }
+      // Sin ruta: en_ruta primero, luego por distancia GPS
       if (a.estado === 'en_ruta' && b.estado !== 'en_ruta') return -1
       if (b.estado === 'en_ruta' && a.estado !== 'en_ruta') return 1
       if (gps && a.clientes?.lat && b.clientes?.lat) {
@@ -336,13 +346,20 @@ export default function RepartidorPage() {
               }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                  pedido.estado === 'en_ruta'
-                    ? 'bg-sky-100 text-sky-700'
-                    : 'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {pedido.estado === 'en_ruta' ? '🚚 En ruta' : '⏳ Pendiente'}
-                </span>
+                <div className="flex items-center gap-2">
+                  {pedido.orden_ruta && (
+                    <span className="w-6 h-6 rounded-full bg-sky-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                      {pedido.orden_ruta}
+                    </span>
+                  )}
+                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                    pedido.estado === 'en_ruta'
+                      ? 'bg-sky-100 text-sky-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {pedido.estado === 'en_ruta' ? '🚚 En ruta' : '⏳ Pendiente'}
+                  </span>
+                </div>
                 {distancia !== null && (
                   <span className="text-xs text-gray-400 font-medium">
                     {distancia < 1
