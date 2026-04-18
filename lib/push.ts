@@ -1,30 +1,38 @@
 'use client'
 
+export type ResultadoPush = 'ok' | 'no_soportado' | 'permiso_denegado' | 'error'
+
 // Activa las notificaciones push para el repartidor actual
-export async function activarPush(repartidorId: string): Promise<boolean> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
+export async function activarPush(repartidorId: string): Promise<ResultadoPush> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return 'no_soportado'
+  }
 
   const permiso = await Notification.requestPermission()
-  if (permiso !== 'granted') return false
+  if (permiso !== 'granted') return 'permiso_denegado'
 
-  const registro = await navigator.serviceWorker.ready
+  try {
+    const registro = await navigator.serviceWorker.ready
 
-  // Suscribir al repartidor a push usando la clave pública VAPID
-  const suscripcion = await registro.pushManager.subscribe({
-    userVisibleOnly:      true,
-    applicationServerKey: urlBase64ToUint8Array(
-      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-    ),
-  })
+    // Suscribir al repartidor a push usando la clave pública VAPID
+    const suscripcion = await registro.pushManager.subscribe({
+      userVisibleOnly:      true,
+      applicationServerKey: urlBase64ToUint8Array(
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+      ),
+    })
 
-  // Guardar la suscripción en la base de datos
-  await fetch('/api/push/suscribir', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ repartidorId, suscripcion }),
-  })
+    // Guardar la suscripción en la base de datos
+    await fetch('/api/push/suscribir', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ repartidorId, suscripcion }),
+    })
 
-  return true
+    return 'ok'
+  } catch {
+    return 'error'
+  }
 }
 
 export function yaEstaActivado(): boolean {

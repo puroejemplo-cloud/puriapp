@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { crearClienteBrowser } from '@/lib/supabase-browser'
 import { distanciaKm } from '@/lib/distancia'
 import VentaRutaModal from '@/components/VentaRutaModal'
-import { activarPush, yaEstaActivado } from '@/lib/push'
+import { activarPush, yaEstaActivado, type ResultadoPush } from '@/lib/push'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -227,8 +227,24 @@ export default function RepartidorPage() {
   async function handleActivarPush() {
     if (!repartidor) return
     setActivandoPush(true)
-    const ok = await activarPush(repartidor.id)
-    setPushActivado(ok)
+    const resultado: ResultadoPush = await activarPush(repartidor.id)
+
+    if (resultado === 'ok') {
+      setPushActivado(true)
+    } else if (resultado === 'no_soportado') {
+      alert(
+        '⚠️ Tu navegador no soporta notificaciones push.\n\n' +
+        'En iPhone: agrega la app a tu pantalla de inicio primero (Safari → Compartir → Agregar a pantalla de inicio), luego vuelve a intentarlo.'
+      )
+    } else if (resultado === 'permiso_denegado') {
+      alert(
+        '🔕 Bloqueaste las notificaciones.\n\n' +
+        'Para activarlas: ve a Configuración de tu teléfono → Notificaciones → [tu navegador] → activa los permisos para este sitio.'
+      )
+    } else {
+      alert('❌ No se pudo activar. Intenta recargar la página.')
+    }
+
     setActivandoPush(false)
   }
 
