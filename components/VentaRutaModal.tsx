@@ -22,6 +22,7 @@ export default function VentaRutaModal({ repartidorId, gps, onClose, onGuardado 
   const [precio, setPrecio] = useState(35)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const [purificadoraId, setPurificadoraId] = useState<string | null>(null)
 
   // GPS propio del modal — usa el del padre o intenta obtener uno fresco
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number } | null>(gps)
@@ -44,8 +45,11 @@ export default function VentaRutaModal({ repartidorId, gps, onClose, onGuardado 
     )
   }, [gps])
 
-  // Obtener precio en ruta desde configuracion
+  // Obtener purificadora_id del usuario y precio en ruta
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setPurificadoraId(user?.user_metadata?.purificadora_id ?? null)
+    })
     supabase
       .from('configuracion')
       .select('valor')
@@ -66,8 +70,9 @@ export default function VentaRutaModal({ repartidorId, gps, onClose, onGuardado 
       const { error: errorVenta } = await supabase
         .from('ventas_ruta')
         .insert({
-          repartidor_id:  repartidorId,
-          nombre_cliente: nombre.trim() || null,
+          repartidor_id:   repartidorId,
+          purificadora_id: purificadoraId,
+          nombre_cliente:  nombre.trim() || null,
           telefono:       telefono.trim() || null,
           direccion:      direccion.trim() || null,
           lat:            ubicacion?.lat ?? null,
@@ -93,9 +98,10 @@ export default function VentaRutaModal({ repartidorId, gps, onClose, onGuardado 
           .from('clientes')
           .upsert(
             {
-              telefono:  telefono.trim(),
-              nombre:    nombre.trim() || 'Cliente sin nombre',
-              direccion: direccion.trim() || 'Sin dirección',
+              telefono:        telefono.trim(),
+              purificadora_id: purificadoraId,
+              nombre:          nombre.trim() || 'Cliente sin nombre',
+              direccion:       direccion.trim() || 'Sin dirección',
               lat:       coords?.lat ?? null,
               lng:       coords?.lng ?? null,
             },
