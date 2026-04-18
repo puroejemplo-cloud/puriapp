@@ -104,7 +104,8 @@ export default function AdminPedidos() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (!res.ok) return
-      const rows: { clave: string; valor: Record<string, number> }[] = await res.json()
+      const json = await res.json()
+      const rows: { clave: string; valor: Record<string, number> }[] = json.data ?? []
       const precio = rows.find(r => r.clave === 'precios')?.valor?.pedido
       if (precio) setPrecioPedido(precio)
     })
