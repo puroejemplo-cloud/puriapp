@@ -50,11 +50,28 @@ export default function AdminConfiguracion() {
     )
   }
 
+  async function guardarConfig(clave: string, valor: unknown, setGuardando: (v: boolean) => void, setMensaje: (v: string) => void) {
+    setGuardando(true); setMensaje('')
+
+    // Buscar fila existente (RLS filtra automáticamente por purificadora)
+    const { data: existente } = await supabase
+      .from('configuracion').select('id').eq('clave', clave).maybeSingle()
+
+    let err
+    if (existente?.id) {
+      ;({ error: err } = await supabase.from('configuracion')
+        .update({ valor }).eq('id', existente.id))
+    } else {
+      ;({ error: err } = await supabase.from('configuracion')
+        .insert({ clave, valor, purificadora_id: purificadoraId }))
+    }
+
+    setGuardando(false)
+    setMensaje(err ? `⚠️ Error: ${err.message}` : '✅ Guardado correctamente')
+  }
+
   async function guardarZona() {
-    setGZ(true); setMZ('')
-    await supabase.from('configuracion')
-      .upsert({ clave: 'geocoding_zona', valor: zona, purificadora_id: purificadoraId }, { onConflict: 'clave,purificadora_id' })
-    setGZ(false); setMZ('✅ Zona guardada correctamente')
+    await guardarConfig('geocoding_zona', zona, setGZ, setMZ)
   }
 
   // ── Precios ───────────────────────────────────────────────────────────────
@@ -62,14 +79,10 @@ export default function AdminConfiguracion() {
     if (precios.pedido <= 0 || precios.ruta <= 0) {
       setMP('⚠️ Los precios deben ser mayores a cero'); return
     }
-    setGP(true); setMP('')
-    await supabase.from('configuracion')
-      .upsert({ clave: 'precios', valor: precios, purificadora_id: purificadoraId }, { onConflict: 'clave,purificadora_id' })
-    // Sincronizar también la tabla productos para compatibilidad
+    await guardarConfig('precios', precios, setGP, setMP)
     await supabase.from('productos')
       .update({ precio: precios.pedido })
       .eq('nombre', 'Garrafón 20L')
-    setGP(false); setMP('✅ Precios guardados correctamente')
   }
 
   const tieneZona = zona.lat !== null && zona.lng !== null
