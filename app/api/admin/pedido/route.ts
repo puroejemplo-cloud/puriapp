@@ -8,6 +8,12 @@ export async function POST(request: NextRequest) {
   const { geocodificar }     = await import('@/lib/geocoding')
 
   const supabase = getSupabaseAdmin()
+  // Obtener purificadora_id del usuario autenticado
+  const authHeader = request.headers.get('Authorization') ?? ''
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user } } = await supabase.auth.getUser(token)
+  const purificadoraId: string | null = user?.user_metadata?.purificadora_id ?? null
+
   const { nombre, telefono, direccion, cantidad, notas, lat, lng, repartidorId } = await request.json()
 
   if (!nombre || !telefono || !direccion || !cantidad) {
@@ -49,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const { data: nuevo, error } = await supabase
       .from('clientes')
-      .insert({ nombre, telefono, direccion, lat: coordsLat, lng: coordsLng })
+      .insert({ nombre, telefono, direccion, lat: coordsLat, lng: coordsLng, purificadora_id: purificadoraId })
       .select('id')
       .single()
 
@@ -75,10 +81,11 @@ export async function POST(request: NextRequest) {
       producto_id:  producto?.id ?? null,
       cantidad,
       total,
-      notas:        notas || null,
-      origen:       'admin',
-      repartidor_id: repartidorId || null,
-      estado:       estadoInicial,
+      notas:           notas || null,
+      origen:          'admin',
+      repartidor_id:   repartidorId || null,
+      estado:          estadoInicial,
+      purificadora_id: purificadoraId,
     })
     .select('id')
     .single()

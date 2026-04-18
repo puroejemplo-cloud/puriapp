@@ -29,7 +29,10 @@ export default function LoginPage() {
       }
 
       const { data: { user } } = await supabase.auth.getUser()
-      if (user?.user_metadata?.role === 'admin') {
+      const role = user?.user_metadata?.role
+      if (role === 'super_admin') {
+        router.push('/superadmin')
+      } else if (role === 'admin') {
         router.push('/admin')
       } else {
         router.push('/repartidor')
