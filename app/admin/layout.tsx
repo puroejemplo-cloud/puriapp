@@ -56,6 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-2">
             <span className="text-xl">💧</span>
             <span className="font-bold text-gray-800 text-sm">Purificadora Admin</span>
+            <span className="text-xs text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">v1.3.0</span>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-500">
             <span className="hidden sm:inline">{email}</span>
