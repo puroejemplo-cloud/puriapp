@@ -23,16 +23,23 @@ export default function AdminConfiguracion() {
   const [purificadoraId, setPurificadoraId] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setPurificadoraId(user?.user_metadata?.purificadora_id ?? null)
-    })
-    Promise.all([
-      supabase.from('configuracion').select('valor').eq('clave', 'geocoding_zona').maybeSingle(),
-      supabase.from('configuracion').select('valor').eq('clave', 'precios').maybeSingle(),
-    ]).then(([{ data: zona }, { data: precios }]) => {
-      if (zona?.valor)    setZona(zona.valor as ZonaConfig)
-      if (precios?.valor) setPrecios(precios.valor as PreciosConfig)
-    })
+    async function cargar() {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+      setPurificadoraId(session?.user?.user_metadata?.purificadora_id ?? null)
+
+      const res = await fetch('/api/admin/configuracion', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!res.ok) return
+      const { data } = await res.json() as { data: { clave: string; valor: unknown }[] }
+
+      for (const row of data) {
+        if (row.clave === 'geocoding_zona') setZona(row.valor as ZonaConfig)
+        if (row.clave === 'precios')        setPrecios(row.valor as PreciosConfig)
+      }
+    }
+    cargar()
   }, [supabase])
 
   // ── Zona ──────────────────────────────────────────────────────────────────
