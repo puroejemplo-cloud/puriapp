@@ -1,7 +1,7 @@
 # Estado del proyecto
 
 **Última actualización:** 2026-04-17
-**Última fase completada:** FASE 6 — Dashboard admin
+**Última fase completada:** FASE 7 — Deploy a Vercel
 
 ---
 
@@ -57,10 +57,20 @@
 
 ---
 
+### FASE 7 — Deploy a Vercel ✅
+- Repo GitHub: `puroejemplo-cloud/puriapp` (rama main)
+- URL producción: `https://purificadorapp-puroejemplo-5776s-projects.vercel.app`
+- Variables de entorno configuradas en Vercel
+- Supabase Auth URL Configuration actualizada
+- Twilio webhook apuntando a producción
+- Login admin y repartidor funcionando en producción
+
+---
+
 ## Siguiente fase
 
-**FASE 7 — Deploy a Vercel**
-Subir el proyecto a producción en HTTPS.
+**FASE 8 — Notificaciones push**
+Repartidor recibe push incluso con la app cerrada.
 
 ---
 
