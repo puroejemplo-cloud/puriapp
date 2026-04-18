@@ -10,7 +10,8 @@ const cookieStorage = {
   setItem: (key: string, value: string): void => {
     if (typeof document === 'undefined') return
     const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString()
-    document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)};path=/;expires=${expires};SameSite=Lax`
+    const secure  = location.protocol === 'https:' ? ';Secure' : ''
+    document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)};path=/;expires=${expires};SameSite=Lax${secure}`
   },
   removeItem: (key: string): void => {
     if (typeof document === 'undefined') return
