@@ -20,7 +20,12 @@ export default function AdminConfiguracion() {
   const [guardandoPrecios, setGP]   = useState(false)
   const [mensajePrecios, setMP]     = useState('')
 
+  const [purificadoraId, setPurificadoraId] = useState<string | null>(null)
+
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setPurificadoraId(user?.user_metadata?.purificadora_id ?? null)
+    })
     Promise.all([
       supabase.from('configuracion').select('valor').eq('clave', 'geocoding_zona').maybeSingle(),
       supabase.from('configuracion').select('valor').eq('clave', 'precios').maybeSingle(),
@@ -48,7 +53,7 @@ export default function AdminConfiguracion() {
   async function guardarZona() {
     setGZ(true); setMZ('')
     await supabase.from('configuracion')
-      .upsert({ clave: 'geocoding_zona', valor: zona }, { onConflict: 'clave' })
+      .upsert({ clave: 'geocoding_zona', valor: zona, purificadora_id: purificadoraId }, { onConflict: 'clave,purificadora_id' })
     setGZ(false); setMZ('✅ Zona guardada correctamente')
   }
 
@@ -59,7 +64,7 @@ export default function AdminConfiguracion() {
     }
     setGP(true); setMP('')
     await supabase.from('configuracion')
-      .upsert({ clave: 'precios', valor: precios }, { onConflict: 'clave' })
+      .upsert({ clave: 'precios', valor: precios, purificadora_id: purificadoraId }, { onConflict: 'clave,purificadora_id' })
     // Sincronizar también la tabla productos para compatibilidad
     await supabase.from('productos')
       .update({ precio: precios.pedido })
