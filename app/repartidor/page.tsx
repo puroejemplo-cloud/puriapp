@@ -45,8 +45,8 @@ export default function RepartidorPage() {
   const [nuevoPedidoId, setNuevoPedidoId] = useState<string | null>(null)
 
   // Modal "Entregado"
-  const [entregandoId, setEntregandoId] = useState<string | null>(null)
-  const [garrafonesRecogidos, setGarrafonesRecogidos] = useState(0)
+  const [entregandoPedido, setEntregandoPedido] = useState<{ id: string; cantidad: number } | null>(null)
+  const [garrafonesEntregados, setGarrafonesEntregados] = useState(0)
 
   // FASE 5: ventas en ruta
   const [modalVentaAbierto, setModalVentaAbierto] = useState(false)
@@ -72,23 +72,34 @@ export default function RepartidorPage() {
     if (data) setPedidos(data as unknown as Pedido[])
   }, [supabase])
 
-  // ── Cargar resumen de ventas del día ───────────────────────────────────
+  // ── Cargar resumen de ventas del día (ventas en ruta + pedidos entregados) ──
   const cargarVentasHoy = useCallback(async (repId: string) => {
     const inicio = new Date()
     inicio.setHours(0, 0, 0, 0)
 
-    const { data } = await supabase
-      .from('ventas_ruta')
-      .select('cantidad, total')
-      .eq('repartidor_id', repId)
-      .gte('created_at', inicio.toISOString())
+    const [{ data: ventas }, { data: entregados }] = await Promise.all([
+      supabase
+        .from('ventas_ruta')
+        .select('cantidad, total')
+        .eq('repartidor_id', repId)
+        .gte('created_at', inicio.toISOString()),
+      supabase
+        .from('pedidos')
+        .select('garrafones_entregados, cantidad, total')
+        .eq('repartidor_id', repId)
+        .eq('estado', 'entregado')
+        .gte('entregado_at', inicio.toISOString()),
+    ])
 
-    if (data) {
-      setVentasHoy({
-        garrafones: data.reduce((s, v) => s + v.cantidad, 0),
-        total:      data.reduce((s, v) => s + Number(v.total), 0),
-      })
-    }
+    const garVentas     = (ventas     ?? []).reduce((s, v) => s + v.cantidad, 0)
+    const totalVentas   = (ventas     ?? []).reduce((s, v) => s + Number(v.total), 0)
+    const garPedidos    = (entregados ?? []).reduce((s, p) => s + (p.garrafones_entregados ?? p.cantidad), 0)
+    const totalPedidos  = (entregados ?? []).reduce((s, p) => s + Number(p.total), 0)
+
+    setVentasHoy({
+      garrafones: garVentas + garPedidos,
+      total:      totalVentas + totalPedidos,
+    })
   }, [supabase])
 
   // ── Auth + carga inicial ───────────────────────────────────────────────
@@ -201,18 +212,18 @@ export default function RepartidorPage() {
   }
 
   async function confirmarEntregado() {
-    if (!entregandoId) return
+    if (!entregandoPedido) return
     await supabase
       .from('pedidos')
       .update({
-        estado: 'entregado',
-        garrafones_recogidos: garrafonesRecogidos,
-        entregado_at: new Date().toISOString(),
+        estado:                'entregado',
+        garrafones_entregados: garrafonesEntregados,
+        entregado_at:          new Date().toISOString(),
       })
-      .eq('id', entregandoId)
-    setEntregandoId(null)
-    setGarrafonesRecogidos(0)
-    await cargarPedidos()
+      .eq('id', entregandoPedido.id)
+    setEntregandoPedido(null)
+    setGarrafonesEntregados(0)
+    await Promise.all([cargarPedidos(), cargarVentasHoy(repartidor!.id)])
   }
 
   function abrirMapa(lat: number, lng: number) {
@@ -403,7 +414,7 @@ export default function RepartidorPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => { setEntregandoId(pedido.id); setGarrafonesRecogidos(0) }}
+                      onClick={() => { setEntregandoPedido({ id: pedido.id, cantidad: pedido.cantidad }); setGarrafonesEntregados(pedido.cantidad) }}
                       className="flex-1 bg-gray-800 active:bg-gray-900 text-white py-2.5 rounded-xl font-semibold text-sm"
                     >
                       ✅ Entregado
@@ -432,24 +443,24 @@ export default function RepartidorPage() {
       </button>
 
       {/* Modal de confirmación de entrega */}
-      {entregandoId && (
+      {entregandoPedido && (
         <div className="fixed inset-0 bg-black/60 flex items-end z-20">
           <div className="bg-white w-full rounded-t-3xl p-6 pb-8 shadow-xl">
             <h2 className="text-lg font-bold text-gray-800 mb-1">Confirmar entrega</h2>
-            <p className="text-sm text-gray-500 mb-5">¿Cuántos garrafones vacíos te devolvió el cliente?</p>
+            <p className="text-sm text-gray-500 mb-5">¿Cuántos garrafones dejaste con el cliente?</p>
 
             <div className="flex items-center justify-center gap-6 mb-6">
               <button
-                onClick={() => setGarrafonesRecogidos(g => Math.max(0, g - 1))}
+                onClick={() => setGarrafonesEntregados(g => Math.max(0, g - 1))}
                 className="w-14 h-14 rounded-full bg-gray-100 active:bg-gray-200 text-3xl font-bold text-gray-600 flex items-center justify-center"
               >
                 −
               </button>
               <span className="text-4xl font-bold text-sky-600 w-14 text-center">
-                {garrafonesRecogidos}
+                {garrafonesEntregados}
               </span>
               <button
-                onClick={() => setGarrafonesRecogidos(g => g + 1)}
+                onClick={() => setGarrafonesEntregados(g => g + 1)}
                 className="w-14 h-14 rounded-full bg-sky-100 active:bg-sky-200 text-3xl font-bold text-sky-600 flex items-center justify-center"
               >
                 +
@@ -458,7 +469,7 @@ export default function RepartidorPage() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setEntregandoId(null)}
+                onClick={() => setEntregandoPedido(null)}
                 className="flex-1 border-2 border-gray-200 active:bg-gray-50 py-3 rounded-2xl text-gray-600 font-semibold"
               >
                 Cancelar
