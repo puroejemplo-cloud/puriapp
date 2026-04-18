@@ -1,5 +1,4 @@
 import { type NextRequest } from 'next/server'
-import twilio from 'twilio'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { parsearComando, MENSAJE_AYUDA } from '@/lib/comandos'
 import { geocodificar } from '@/lib/geocoding'
@@ -9,6 +8,8 @@ export const dynamic = 'force-dynamic'
 
 // Twilio envía application/x-www-form-urlencoded, no JSON
 export async function POST(request: NextRequest) {
+  // Import lazy para evitar crash en build time (twilio hace trabajo al importarse)
+  const twilio = (await import('twilio')).default
   const supabaseAdmin = getSupabaseAdmin()
   const formData = await request.formData()
 
