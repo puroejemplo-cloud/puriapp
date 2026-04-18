@@ -71,7 +71,7 @@ export default function AdminConfiguracion() {
     const json = await res.json()
 
     setGuardando(false)
-    setMensaje(json.ok ? '✅ Guardado correctamente' : `⚠️ Error: ${json.error}`)
+    setMensaje(json.ok ? '✅ Guardado v1.3' : `⚠️ Error: ${json.error}`)
   }
 
   async function guardarZona() {
