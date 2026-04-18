@@ -174,7 +174,7 @@ export default function RepartidorPage() {
               navigator.vibrate?.([300, 150, 300])
               setNuevoPedidoId((payload.new as Pedido).id)
               setTimeout(() => setNuevoPedidoId(null), 4000)
-              try { await new Audio('/notif.mp3').play() } catch { /* opcional */ }
+              try { await new Audio('/gota.mp3').play() } catch { /* opcional */ }
             }
           }
         )

@@ -7,9 +7,13 @@ import RegistrarSW from '@/components/RegistrarSW'
 const geist = Geist({ variable: '--font-geist', subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Purificadora — Repartidor',
+  title: 'Purificadora',
   description: 'App de entregas de agua a domicilio',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon-192.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
