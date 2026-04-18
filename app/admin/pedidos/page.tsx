@@ -300,14 +300,7 @@ export default function AdminPedidos() {
                 >
                   Marcar entregado
                 </button>
-                {p.clientes?.telefono && (
-                  <a
-                    href={`tel:${p.clientes.telefono}`}
-                    className="text-xs bg-sky-50 text-sky-600 border border-sky-200 px-3 py-1.5 rounded-lg"
-                  >
-                    📞 Llamar
-                  </a>
-                )}
+
                 <button
                   onClick={() => cambiarEstado(p.id, 'cancelado')}
                   className="text-xs bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg"

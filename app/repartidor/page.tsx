@@ -402,15 +402,22 @@ export default function RepartidorPage() {
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold text-gray-800 text-base">{pedido.clientes?.nombre ?? '—'}</p>
                 {pedido.clientes?.telefono && (
-                  <a
-                    href={`https://wa.me/${pedido.clientes.telefono.replace('+', '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full border border-green-200 active:bg-green-100 shrink-0"
-                  >
-                    <span>💬</span>
-                    <span>{pedido.clientes.telefono}</span>
-                  </a>
+                  <div className="flex gap-1.5 shrink-0">
+                    <a
+                      href={`tel:${pedido.clientes.telefono}`}
+                      className="flex items-center gap-1 bg-sky-50 text-sky-700 text-xs px-2.5 py-1 rounded-full border border-sky-200 active:bg-sky-100"
+                    >
+                      📞 Llamar
+                    </a>
+                    <a
+                      href={`https://wa.me/${pedido.clientes.telefono.replace('+', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full border border-green-200 active:bg-green-100"
+                    >
+                      💬 WA
+                    </a>
+                  </div>
                 )}
               </div>
               <p className="text-sm text-gray-500 leading-snug">{pedido.clientes?.direccion}</p>
