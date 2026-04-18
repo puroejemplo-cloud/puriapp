@@ -17,11 +17,13 @@ type Pedido = {
 }
 
 type NuevoPedidoForm = {
-  nombre:    string
-  telefono:  string
-  direccion: string
-  cantidad:  number
-  notas:     string
+  nombre:       string
+  telefono:     string
+  direccion:    string
+  urlUbicacion: string
+  cantidad:     number
+  notas:        string
+  repartidorId: string
 }
 
 const ESTADOS = ['todos', 'pendiente', 'en_ruta', 'entregado', 'cancelado'] as const
@@ -37,20 +39,35 @@ const COLOR_ESTADO: Record<string, string> = {
   cancelado: 'bg-gray-100 text-gray-500',
 }
 
-const FORM_VACIO: NuevoPedidoForm = { nombre: '', telefono: '', direccion: '', cantidad: 1, notas: '' }
+// Extrae lat/lng de una URL de Google Maps
+function parsearUbicacion(url: string): { lat: number; lng: number } | null {
+  if (!url.trim()) return null
+  // Formato: /@lat,lng,zoom  (el más común al compartir desde Google Maps)
+  const atMatch = url.match(/@(-?\d+\.?\d+),(-?\d+\.?\d+)/)
+  if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) }
+  // Formato: ?q=lat,lng
+  const qMatch = url.match(/[?&]q=(-?\d+\.?\d+),(-?\d+\.?\d+)/)
+  if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) }
+  return null
+}
+
+const FORM_VACIO: NuevoPedidoForm = {
+  nombre: '', telefono: '', direccion: '', urlUbicacion: '',
+  cantidad: 1, notas: '', repartidorId: '',
+}
 
 export default function AdminPedidos() {
-  const supabase      = useMemo(() => crearClienteBrowser(), [])
+  const supabase = useMemo(() => crearClienteBrowser(), [])
   const [pedidos, setPedidos]           = useState<Pedido[]>([])
   const [repartidores, setRepartidores] = useState<Repartidor[]>([])
   const [filtro, setFiltro]             = useState<Filtro>('todos')
   const [cargando, setCargando]         = useState(true)
 
-  // Modal nuevo pedido
   const [modalAbierto, setModalAbierto] = useState(false)
   const [form, setForm]                 = useState<NuevoPedidoForm>(FORM_VACIO)
   const [guardando, setGuardando]       = useState(false)
   const [errorForm, setErrorForm]       = useState('')
+  const [urlValida, setUrlValida]       = useState<boolean | null>(null)
 
   async function cargar() {
     let q = supabase
@@ -68,7 +85,14 @@ export default function AdminPedidos() {
 
   useEffect(() => {
     supabase.from('repartidores').select('id, nombre').eq('activo', true)
-      .then(({ data }) => setRepartidores(data ?? []))
+      .then(({ data }) => {
+        const lista = data ?? []
+        setRepartidores(lista)
+        // Seleccionar el primero por default si existe
+        if (lista.length > 0) {
+          setForm(f => ({ ...f, repartidorId: lista[0].id }))
+        }
+      })
   }, [supabase])
 
   useEffect(() => {
@@ -94,6 +118,20 @@ export default function AdminPedidos() {
     setForm(f => ({ ...f, [k]: v }))
   }
 
+  function onUrlChange(url: string) {
+    setField('urlUbicacion', url)
+    if (!url.trim()) { setUrlValida(null); return }
+    setUrlValida(parsearUbicacion(url) !== null)
+  }
+
+  function abrirModal() {
+    setModalAbierto(true)
+    setErrorForm('')
+    setUrlValida(null)
+    // Preservar repartidor por default si ya hay uno seleccionado
+    setForm(f => ({ ...FORM_VACIO, repartidorId: f.repartidorId }))
+  }
+
   async function crearPedido() {
     setErrorForm('')
     if (!form.nombre.trim())    return setErrorForm('El nombre es requerido')
@@ -101,20 +139,25 @@ export default function AdminPedidos() {
     if (!form.direccion.trim()) return setErrorForm('La dirección es requerida')
     if (form.cantidad < 1)      return setErrorForm('La cantidad debe ser al menos 1')
 
-    // Formatear teléfono con +52 si no tiene código de país
     let tel = form.telefono.trim().replace(/\s/g, '')
     if (!tel.startsWith('+')) tel = '+52' + tel.replace(/^52/, '')
+
+    // Parsear coords de la URL si se proporcionó
+    const coords = parsearUbicacion(form.urlUbicacion)
 
     setGuardando(true)
     const res = await fetch('/api/admin/pedido', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nombre:   form.nombre.trim(),
-        telefono: tel,
-        direccion: form.direccion.trim(),
-        cantidad:  form.cantidad,
-        notas:     form.notas.trim() || null,
+        nombre:      form.nombre.trim(),
+        telefono:    tel,
+        direccion:   form.direccion.trim(),
+        cantidad:    form.cantidad,
+        notas:       form.notas.trim() || null,
+        lat:         coords?.lat ?? null,
+        lng:         coords?.lng ?? null,
+        repartidorId: form.repartidorId || null,
       }),
     })
 
@@ -127,7 +170,6 @@ export default function AdminPedidos() {
     }
 
     setModalAbierto(false)
-    setForm(FORM_VACIO)
   }
 
   return (
@@ -135,14 +177,14 @@ export default function AdminPedidos() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-gray-800">Pedidos</h1>
         <button
-          onClick={() => { setModalAbierto(true); setForm(FORM_VACIO); setErrorForm('') }}
+          onClick={abrirModal}
           className="bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
         >
           + Nuevo pedido
         </button>
       </div>
 
-      {/* Filtros de estado */}
+      {/* Filtros */}
       <div className="flex gap-2 flex-wrap mb-4">
         {ESTADOS.map(e => (
           <button
@@ -191,7 +233,6 @@ export default function AdminPedidos() {
               </div>
             </div>
 
-            {/* Acciones */}
             {p.estado !== 'entregado' && p.estado !== 'cancelado' && (
               <div className="flex gap-2 mt-3 flex-wrap">
                 {p.estado === 'pendiente' && (
@@ -229,10 +270,27 @@ export default function AdminPedidos() {
       {/* Modal nuevo pedido */}
       {modalAbierto && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Nuevo pedido</h2>
 
             <div className="space-y-3">
+
+              {/* Repartidor */}
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Repartidor asignado</label>
+                <select
+                  value={form.repartidorId}
+                  onChange={e => setField('repartidorId', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+                >
+                  <option value="">Sin asignar (quedará pendiente)</option>
+                  {repartidores.map(r => (
+                    <option key={r.id} value={r.id}>{r.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Nombre */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Nombre del cliente *</label>
                 <input
@@ -244,6 +302,7 @@ export default function AdminPedidos() {
                 />
               </div>
 
+              {/* Teléfono */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Teléfono *</label>
                 <input
@@ -253,9 +312,10 @@ export default function AdminPedidos() {
                   onChange={e => setField('telefono', e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
-                <p className="text-xs text-gray-400 mt-0.5">Se agregará +52 si no incluyes código de país</p>
+                <p className="text-xs text-gray-400 mt-0.5">Se agrega +52 si no incluyes código de país</p>
               </div>
 
+              {/* Dirección */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Dirección *</label>
                 <input
@@ -265,9 +325,31 @@ export default function AdminPedidos() {
                   onChange={e => setField('direccion', e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
-                <p className="text-xs text-gray-400 mt-0.5">Se geocodifica automáticamente para el mapa</p>
               </div>
 
+              {/* URL de ubicación */}
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  URL de ubicación (Google Maps)
+                  <span className="text-gray-400 font-normal ml-1">— opcional</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://maps.google.com/..."
+                  value={form.urlUbicacion}
+                  onChange={e => onUrlChange(e.target.value)}
+                  className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 ${
+                    urlValida === false ? 'border-red-300' :
+                    urlValida === true  ? 'border-green-400' :
+                    'border-gray-200'
+                  }`}
+                />
+                {urlValida === true  && <p className="text-xs text-green-600 mt-0.5">✓ Coordenadas detectadas</p>}
+                {urlValida === false && <p className="text-xs text-red-500 mt-0.5">No se encontraron coordenadas en esta URL</p>}
+                {urlValida === null  && <p className="text-xs text-gray-400 mt-0.5">Pega la URL que aparece al compartir desde Google Maps</p>}
+              </div>
+
+              {/* Garrafones */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Garrafones *</label>
                 <div className="flex items-center gap-3">
@@ -288,6 +370,7 @@ export default function AdminPedidos() {
                 </div>
               </div>
 
+              {/* Notas */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Notas (opcional)</label>
                 <input
