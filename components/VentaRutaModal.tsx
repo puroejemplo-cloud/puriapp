@@ -44,15 +44,16 @@ export default function VentaRutaModal({ repartidorId, gps, onClose, onGuardado 
     )
   }, [gps])
 
-  // Obtener precio actual del garrafón desde la BD
+  // Obtener precio en ruta desde configuracion
   useEffect(() => {
     supabase
-      .from('productos')
-      .select('precio')
-      .eq('nombre', 'Garrafón 20L')
-      .eq('activo', true)
+      .from('configuracion')
+      .select('valor')
+      .eq('clave', 'precios')
       .maybeSingle()
-      .then(({ data }) => { if (data) setPrecio(Number(data.precio)) })
+      .then(({ data }) => {
+        if (data?.valor?.ruta) setPrecio(Number(data.valor.ruta))
+      })
   }, [supabase])
 
   const total = cantidad * precio

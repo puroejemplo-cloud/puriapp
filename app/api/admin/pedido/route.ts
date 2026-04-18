@@ -57,15 +57,12 @@ export async function POST(request: NextRequest) {
     clienteId = nuevo.id
   }
 
-  // Precio del garrafón
-  const { data: producto } = await supabase
-    .from('productos')
-    .select('id, precio')
-    .eq('nombre', 'Garrafón 20L')
-    .eq('activo', true)
-    .maybeSingle()
-
-  const precio = producto?.precio ?? 35
+  // Precio del garrafón — leer desde configuracion, fallback a productos
+  const [{ data: cfgPrecios }, { data: producto }] = await Promise.all([
+    supabase.from('configuracion').select('valor').eq('clave', 'precios').maybeSingle(),
+    supabase.from('productos').select('id, precio').eq('nombre', 'Garrafón 20L').eq('activo', true).maybeSingle(),
+  ])
+  const precio = cfgPrecios?.valor?.pedido ?? producto?.precio ?? 35
   const total  = precio * cantidad
 
   // Si se asigna repartidor, el pedido arranca en_ruta
