@@ -3,14 +3,14 @@
 import { useEffect, useState, useMemo } from 'react'
 import { crearClienteBrowser } from '@/lib/supabase-browser'
 
-type ZonaConfig   = { lat: number | null; lng: number | null; radio_km: number }
+type ZonaConfig   = { lat: number | null; lng: number | null; radio_km: number; ciudad?: string }
 type PreciosConfig = { pedido: number; ruta: number }
 
 export default function AdminConfiguracion() {
   const supabase = useMemo(() => crearClienteBrowser(), [])
 
   // Zona de geocoding
-  const [zona, setZona]             = useState<ZonaConfig>({ lat: null, lng: null, radio_km: 10 })
+  const [zona, setZona]             = useState<ZonaConfig>({ lat: null, lng: null, radio_km: 10, ciudad: '' })
   const [guardandoZona, setGZ]      = useState(false)
   const [mensajeZona, setMZ]        = useState('')
   const [obteniendo, setObteniendo] = useState(false)
@@ -246,6 +246,20 @@ export default function AdminConfiguracion() {
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-300"
             />
           </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="text-xs font-medium text-gray-600 mb-1 block">
+            Ciudad / Estado <span className="text-gray-400 font-normal">(mejora la precisión del geocoding)</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Ej: Guadalupe, Zacatecas"
+            value={zona.ciudad ?? ''}
+            onChange={e => setZona(z => ({ ...z, ciudad: e.target.value }))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-300"
+          />
+          <p className="text-xs text-gray-400 mt-1">Se añade al buscar cada dirección para evitar confusiones con otras ciudades</p>
         </div>
 
         <div className="mb-4">

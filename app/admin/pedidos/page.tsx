@@ -14,7 +14,7 @@ type Pedido = {
   notas:         string | null
   created_at:    string
   clientes:      { nombre: string; telefono: string; direccion: string; lat: number | null; lng: number | null } | null
-  repartidores:  { nombre: string; lat: number | null; lng: number | null } | null
+  repartidores:  { nombre: string; lat: number | null; lng: number | null; ultima_ubicacion: string | null } | null
 }
 
 type NuevoPedidoForm = {
@@ -76,7 +76,7 @@ export default function AdminPedidos() {
   async function cargar() {
     let q = supabase
       .from('pedidos')
-      .select('id, estado, cantidad, total, notas, created_at, clientes(nombre,telefono,direccion,lat,lng), repartidores(nombre,lat,lng)')
+      .select('id, estado, cantidad, total, notas, created_at, clientes(nombre,telefono,direccion,lat,lng), repartidores(nombre,lat,lng,ultima_ubicacion)')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -266,11 +266,23 @@ export default function AdminPedidos() {
                 {p.repartidores && (
                   <p className="text-xs text-gray-500 mt-0.5">
                     🚚 {p.repartidores.nombre}
-                    {p.repartidores.lat && p.clientes?.lat && (
-                      <span className="ml-1.5 text-sky-500 font-medium">
-                        · {distanciaKm(p.repartidores.lat, p.repartidores.lng!, p.clientes.lat, p.clientes.lng!).toFixed(1)} km
-                      </span>
-                    )}
+                    {(() => {
+                      const rep = p.repartidores
+                      const cli = p.clientes
+                      if (!rep.lat || !rep.lng || !cli?.lat || !cli?.lng) return null
+                      // Solo mostrar si la ubicación fue actualizada hace menos de 10 minutos
+                      const hace10min = Date.now() - 10 * 60 * 1000
+                      const actualizada = rep.ultima_ubicacion ? new Date(rep.ultima_ubicacion).getTime() : 0
+                      if (actualizada < hace10min) return (
+                        <span className="ml-1.5 text-gray-300 font-medium">· sin ubicación reciente</span>
+                      )
+                      const km = distanciaKm(rep.lat, rep.lng, cli.lat, cli.lng)
+                      return (
+                        <span className="ml-1.5 text-sky-500 font-medium">
+                          · {km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`}
+                        </span>
+                      )
+                    })()}
                   </p>
                 )}
                 {p.notas && <p className="text-xs text-gray-400 mt-0.5 italic">{p.notas}</p>}

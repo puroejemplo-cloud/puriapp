@@ -11,6 +11,7 @@ export interface ZonaGeocoding {
   lat: number
   lng: number
   radio_km: number
+  ciudad?: string  // Ej: "Guadalupe, Zacatecas" — se añade al query para mejorar precisión
 }
 
 function distanciaKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -51,17 +52,24 @@ export async function geocodificar(
   zona?: ZonaGeocoding | null
 ): Promise<Coordenadas | null> {
 
+  // Si hay ciudad configurada, añadirla al query mejora mucho la precisión
+  const query = zona?.ciudad ? `${direccion}, ${zona.ciudad}` : direccion
+
   // Intento 1: con viewbox como sugerencia (sin bounded para no excluir resultados)
   const extra1: Record<string, string> = {}
   if (zona?.lat && zona?.lng) {
     extra1.viewbox = calcularViewbox(zona)
-    // No usamos bounded=1 para no descartar resultados cercanos al borde
   }
-  let datos = await buscarEnNominatim(direccion, extra1)
+  let datos = await buscarEnNominatim(query, extra1)
 
   // Intento 2: sin restricción de zona si no hubo resultados
   if (!datos?.length && zona?.lat) {
-    datos = await buscarEnNominatim(direccion)
+    datos = await buscarEnNominatim(query)
+  }
+
+  // Intento 3: solo la dirección original sin ciudad (último recurso)
+  if (!datos?.length && zona?.ciudad) {
+    datos = await buscarEnNominatim(direccion, extra1)
   }
 
   if (!datos?.length) return null
