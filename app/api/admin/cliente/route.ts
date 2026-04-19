@@ -17,6 +17,9 @@ export async function DELETE(request: NextRequest) {
   const { id } = await request.json()
   if (!id) return NextResponse.json({ error: 'Falta el id' }, { status: 400 })
 
+  // Desvincular pedidos del cliente antes de eliminarlo
+  await supabase.from('pedidos').update({ cliente_id: null }).eq('cliente_id', id)
+
   const { error } = await supabase.from('clientes').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

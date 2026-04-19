@@ -104,8 +104,12 @@ export default function AdminClientes() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
       body: JSON.stringify({ id: c.id }),
     })
-    if (res.ok) cargar()
-    else alert('No se pudo eliminar. El cliente puede tener pedidos asociados.')
+    if (res.ok) {
+      cargar()
+    } else {
+      const json = await res.json().catch(() => ({}))
+      alert(`Error al eliminar: ${json.error ?? res.status}`)
+    }
   }
 
   if (modo === 'form') {
