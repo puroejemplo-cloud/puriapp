@@ -14,6 +14,8 @@ export default function AdminConfiguracion() {
   const [guardandoZona, setGZ]      = useState(false)
   const [mensajeZona, setMZ]        = useState('')
   const [obteniendo, setObteniendo] = useState(false)
+  const [urlMaps, setUrlMaps]       = useState('')
+  const [urlError, setUrlError]     = useState('')
 
   // Precios
   const [precios, setPrecios]       = useState<PreciosConfig>({ pedido: 35, ruta: 35 })
@@ -43,6 +45,27 @@ export default function AdminConfiguracion() {
   }, [supabase])
 
   // ── Zona ──────────────────────────────────────────────────────────────────
+  function extraerCoordsDeUrl(url: string) {
+    setUrlError('')
+    // Formato /@lat,lng,zoom
+    const atMatch = url.match(/@(-?\d+\.?\d+),(-?\d+\.?\d+)/)
+    if (atMatch) {
+      setZona(z => ({ ...z, lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) }))
+      setUrlMaps('')
+      setMZ('📍 Coordenadas extraídas de la URL. Guarda los cambios para aplicarlas.')
+      return
+    }
+    // Formato ?q=lat,lng
+    const qMatch = url.match(/[?&]q=(-?\d+\.?\d+),(-?\d+\.?\d+)/)
+    if (qMatch) {
+      setZona(z => ({ ...z, lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) }))
+      setUrlMaps('')
+      setMZ('📍 Coordenadas extraídas de la URL. Guarda los cambios para aplicarlas.')
+      return
+    }
+    setUrlError('No se encontraron coordenadas en esta URL. Asegúrate de pegar la URL completa de Google Maps.')
+  }
+
   function usarUbicacionActual() {
     if (!navigator.geolocation) { setMZ('⚠️ Tu navegador no soporta geolocalización'); return }
     setObteniendo(true); setMZ('')
@@ -178,6 +201,31 @@ export default function AdminConfiguracion() {
         >
           {obteniendo ? '📡 Obteniendo ubicación...' : '📍 Usar mi ubicación actual como centro'}
         </button>
+
+        {/* Pegar URL de Google Maps */}
+        <div className="mb-3">
+          <label className="text-xs font-medium text-gray-600 mb-1 block">
+            Pegar URL de Google Maps
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="https://www.google.com/maps/@19.4326,-99.1332,13z"
+              value={urlMaps}
+              onChange={e => { setUrlMaps(e.target.value); setUrlError('') }}
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+            />
+            <button
+              onClick={() => extraerCoordsDeUrl(urlMaps)}
+              disabled={!urlMaps.trim()}
+              className="bg-sky-500 disabled:opacity-40 text-white text-xs font-semibold px-3 py-2 rounded-xl shrink-0"
+            >
+              Extraer
+            </button>
+          </div>
+          {urlError && <p className="text-xs text-red-500 mt-1">{urlError}</p>}
+          <p className="text-xs text-gray-400 mt-1">Abre Google Maps, centra el mapa en tu zona y copia la URL del navegador</p>
+        </div>
 
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div>

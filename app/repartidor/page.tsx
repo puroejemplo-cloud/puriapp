@@ -41,6 +41,7 @@ export default function RepartidorPage() {
   const [repartidor, setRepartidor] = useState<Repartidor | null>(null)
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [gps, setGps] = useState<GPS | null>(null)
+  const [zona, setZona] = useState<{ lat: number; lng: number; radio_km: number } | null>(null)
   const [cargando, setCargando] = useState(true)
   const [nuevoPedidoId, setNuevoPedidoId] = useState<string | null>(null)
 
@@ -128,6 +129,15 @@ export default function RepartidorPage() {
         setRepartidor(rep)
         await Promise.all([cargarPedidos(), cargarVentasHoy(rep.id)])
         setPushActivado(yaEstaActivado())
+
+        // Cargar zona de geocoding para validar si mostrar botón Navegar
+        const { data: cfgZona } = await supabase
+          .from('configuracion')
+          .select('valor')
+          .eq('clave', 'geocoding_zona')
+          .maybeSingle()
+        if (cfgZona?.valor) setZona(cfgZona.valor as { lat: number; lng: number; radio_km: number })
+
         setCargando(false)
       } catch {
         if (activo) router.replace('/login')
@@ -448,7 +458,7 @@ export default function RepartidorPage() {
 
                 {pedido.estado === 'en_ruta' && esMiPedido && (
                   <>
-                    {lat && lng && (
+                    {lat && lng && (!zona || distanciaKm(zona.lat, zona.lng, lat, lng) <= zona.radio_km) && (
                       <button
                         onClick={() => abrirMapa(lat, lng)}
                         className="flex-1 bg-green-500 active:bg-green-600 text-white py-2.5 rounded-xl font-semibold text-sm"
