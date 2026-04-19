@@ -458,14 +458,21 @@ export default function RepartidorPage() {
 
                 {pedido.estado === 'en_ruta' && esMiPedido && (
                   <>
-                    {lat && lng && (!zona || distanciaKm(zona.lat, zona.lng, lat, lng) <= zona.radio_km) && (
-                      <button
-                        onClick={() => abrirMapa(lat, lng)}
-                        className="flex-1 bg-green-500 active:bg-green-600 text-white py-2.5 rounded-xl font-semibold text-sm"
-                      >
-                        🗺 Navegar
-                      </button>
-                    )}
+                    {(() => {
+                      const coordsValidas = lat && lng && (!zona || distanciaKm(zona.lat, zona.lng, lat, lng) <= zona.radio_km)
+                      const direccion = pedido.clientes?.direccion ?? ''
+                      const url = coordsValidas
+                        ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
+                      return (
+                        <button
+                          onClick={() => window.open(url, '_blank')}
+                          className="flex-1 bg-green-500 active:bg-green-600 text-white py-2.5 rounded-xl font-semibold text-sm"
+                        >
+                          🗺 {coordsValidas ? 'Navegar' : 'Buscar dirección'}
+                        </button>
+                      )
+                    })()}
                     <button
                       onClick={() => { setEntregandoPedido({ id: pedido.id, cantidad: pedido.cantidad }); setGarrafonesEntregados(pedido.cantidad) }}
                       className="flex-1 bg-gray-800 active:bg-gray-900 text-white py-2.5 rounded-xl font-semibold text-sm"
