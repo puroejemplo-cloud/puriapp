@@ -98,8 +98,14 @@ export default function AdminClientes() {
 
   async function eliminar(c: Cliente) {
     if (!confirm(`¿Eliminar a ${c.nombre}? Esta acción no se puede deshacer.`)) return
-    await supabase.from('clientes').delete().eq('id', c.id)
-    cargar()
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/cliente', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+      body: JSON.stringify({ id: c.id }),
+    })
+    if (res.ok) cargar()
+    else alert('No se pudo eliminar. El cliente puede tener pedidos asociados.')
   }
 
   if (modo === 'form') {
