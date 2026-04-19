@@ -96,6 +96,12 @@ export default function AdminClientes() {
     cargar()
   }
 
+  async function eliminar(c: Cliente) {
+    if (!confirm(`¿Eliminar a ${c.nombre}? Esta acción no se puede deshacer.`)) return
+    await supabase.from('clientes').delete().eq('id', c.id)
+    cargar()
+  }
+
   if (modo === 'form') {
     return (
       <div>
@@ -205,9 +211,13 @@ export default function AdminClientes() {
               </button>
               <button onClick={() => toggleActivo(c)}
                 className={`text-xs px-3 py-1.5 rounded-lg ${
-                  c.activo ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'
+                  c.activo ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'
                 }`}>
                 {c.activo ? 'Desactivar' : 'Activar'}
+              </button>
+              <button onClick={() => eliminar(c)}
+                className="text-xs bg-red-50 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-100">
+                Eliminar
               </button>
             </div>
           </div>
