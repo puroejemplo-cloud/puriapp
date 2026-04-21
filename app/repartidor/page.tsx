@@ -22,6 +22,8 @@ type Pedido = {
   clientes: {
     nombre: string
     direccion: string
+    colonia: string | null
+    municipio: string | null
     lat: number | null
     lng: number | null
     telefono: string
@@ -69,7 +71,7 @@ export default function RepartidorPage() {
       .from('pedidos')
       .select(`
         id, estado, cantidad, total, notas, repartidor_id, created_at,
-        clientes (nombre, direccion, lat, lng, telefono, referencias)
+        clientes (nombre, direccion, colonia, municipio, lat, lng, telefono, referencias)
       `)
       .in('estado', ['pendiente', 'en_ruta'])
       .order('created_at', { ascending: true })
@@ -446,6 +448,11 @@ export default function RepartidorPage() {
                 )}
               </div>
               <p className="text-sm text-gray-500 leading-snug">{pedido.clientes?.direccion}</p>
+              {(pedido.clientes?.colonia || pedido.clientes?.municipio) && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {[pedido.clientes.colonia, pedido.clientes.municipio].filter(Boolean).join(', ')}
+                </p>
+              )}
               {pedido.clientes?.referencias && (
                 <p className="text-xs text-gray-400 italic mt-0.5">📌 {pedido.clientes.referencias}</p>
               )}

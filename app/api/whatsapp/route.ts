@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server'
 import { parsearComando, MENSAJE_AYUDA } from '@/lib/comandos'
-import { geocodificar } from '@/lib/geocoding'
+import { geocodificar, reverseGeocode } from '@/lib/geocoding'
 import { estaAbierto, horarioDeHoy, HORARIO_DEFAULT, type HorarioSemana } from '@/lib/horario'
 
 export const runtime = 'nodejs'
@@ -49,8 +49,11 @@ export async function POST(request: NextRequest) {
         `📍 Recibimos tu ubicación, pero aún no estás registrado.\n\n` +
         `Para registrarte escribe:\n*REGISTRO|Tu Nombre|Tu Dirección*`
     } else if (!cliente.lat && !cliente.lng) {
-      // Primera vez que comparte ubicación → guardar directo
-      await supabaseAdmin.from('clientes').update({ lat, lng }).eq('id', cliente.id)
+      // Primera vez que comparte ubicación → guardar directo + geocodificación inversa
+      const { municipio, colonia } = await reverseGeocode(lat, lng)
+      await supabaseAdmin.from('clientes')
+        .update({ lat, lng, ...(municipio && { municipio }), ...(colonia && { colonia }) })
+        .eq('id', cliente.id)
       respuesta = `📍 ¡Ubicación guardada, ${cliente.nombre}! Ahora tus pedidos llegarán más rápido. 🚀`
     } else {
       // Ya tiene coords → guardar como pendiente y pedir confirmación
@@ -68,10 +71,14 @@ export async function POST(request: NextRequest) {
              (comando.tipo === 'CONFIRMAR' || comando.tipo === 'RECHAZAR')) {
 
     if (comando.tipo === 'CONFIRMAR') {
-      // Aplicar la ubicación pendiente
+      // Aplicar la ubicación pendiente + geocodificación inversa
+      const { municipio, colonia } = await reverseGeocode(cliente.lat_pendiente!, cliente.lng_pendiente!)
       await supabaseAdmin.from('clientes')
-        .update({ lat: cliente.lat_pendiente, lng: cliente.lng_pendiente,
-                  lat_pendiente: null, lng_pendiente: null })
+        .update({
+          lat: cliente.lat_pendiente, lng: cliente.lng_pendiente,
+          lat_pendiente: null, lng_pendiente: null,
+          ...(municipio && { municipio }), ...(colonia && { colonia }),
+        })
         .eq('id', cliente.id)
       respuesta = `✅ Ubicación actualizada correctamente. ¡Gracias, ${cliente.nombre}!`
     } else {
