@@ -25,6 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [email,          setEmail]          = useState('')
   const [userId,         setUserId]         = useState('')
   const [purificadoraId, setPurificadoraId] = useState('')
+  const [logoUrl,        setLogoUrl]        = useState<string | null>(null)
   const [verificando,    setVerificando]    = useState(true)
 
   // Push
@@ -44,8 +45,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
       setEmail(user.email ?? 'Admin')
       setUserId(user.id)
-      setPurificadoraId(user.user_metadata?.purificadora_id ?? '')
+      const puriId = user.user_metadata?.purificadora_id ?? ''
+      setPurificadoraId(puriId)
       setPushActivo(pushAdminActivo())
+
+      // Cargar logo si existe
+      if (puriId) {
+        const { data: cfgLogo } = await supabase
+          .from('configuracion')
+          .select('valor')
+          .eq('clave', 'logo_url')
+          .eq('purificadora_id', puriId)
+          .maybeSingle()
+        if (cfgLogo?.valor) setLogoUrl(cfgLogo.valor as string)
+      }
+
       setVerificando(false)
     }
     verificar()
@@ -95,7 +109,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
           <div className="flex items-center gap-2">
-            <span className="text-xl">💧</span>
+            {logoUrl
+              ? <img src={logoUrl} alt="Logo" className="h-7 w-7 rounded-lg object-cover" />
+              : <span className="text-xl">💧</span>
+            }
             <span className="font-bold text-gray-800 text-sm">Purificadora Admin</span>
             <span className="text-xs text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">v1.3.0</span>
           </div>

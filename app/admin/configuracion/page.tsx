@@ -25,6 +25,11 @@ export default function AdminConfiguracion() {
   const [purificadoraId, setPurificadoraId] = useState<string | null>(null)
   const [urlCopiada, setUrlCopiada]         = useState(false)
 
+  // Logo
+  const [logoUrl,       setLogoUrl]       = useState<string | null>(null)
+  const [subiendoLogo,  setSubiendoLogo]  = useState(false)
+  const [mensajeLogo,   setMensajeLogo]   = useState('')
+
   // Municipios / colonias
   const [municipios,       setMunicipios]       = useState<string[]>([])
   const [nuevoMunicipio,   setNuevoMunicipio]   = useState('')
@@ -47,6 +52,7 @@ export default function AdminConfiguracion() {
         if (row.clave === 'geocoding_zona') setZona(row.valor as ZonaConfig)
         if (row.clave === 'precios')        setPrecios(row.valor as PreciosConfig)
         if (row.clave === 'municipios')     setMunicipios((row.valor as string[]) ?? [])
+        if (row.clave === 'logo_url')       setLogoUrl(row.valor as string)
       }
     }
     cargar()
@@ -107,6 +113,30 @@ export default function AdminConfiguracion() {
 
   async function guardarZona() {
     await guardarConfig('geocoding_zona', zona, setGZ, setMZ)
+  }
+
+  // ── Logo ──────────────────────────────────────────────────────────────────
+  async function subirLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !purificadoraId) return
+    setSubiendoLogo(true)
+    setMensajeLogo('')
+
+    const { error: uploadError } = await supabase.storage
+      .from('logos')
+      .upload(`${purificadoraId}/logo`, file, { upsert: true, contentType: file.type })
+
+    if (uploadError) {
+      setMensajeLogo(`⚠️ Error al subir: ${uploadError.message}`)
+      setSubiendoLogo(false)
+      return
+    }
+
+    const { data: urlData } = supabase.storage.from('logos').getPublicUrl(`${purificadoraId}/logo`)
+    // Añadir timestamp para evitar caché al reemplazar el logo
+    const url = `${urlData.publicUrl}?v=${Date.now()}`
+    setLogoUrl(url)
+    await guardarConfig('logo_url', url, setSubiendoLogo, setMensajeLogo)
   }
 
   // ── Municipios ────────────────────────────────────────────────────────────
@@ -186,6 +216,44 @@ export default function AdminConfiguracion() {
               Abrir →
             </a>
           </div>
+        </div>
+      )}
+
+      {/* ── LOGO ────────────────────────────────────────────────────────── */}
+      {purificadoraId && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <h2 className="font-semibold text-gray-800 mb-1">🖼️ Logo de la purificadora</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Aparece en el panel admin, la app del repartidor y la página de pedidos.
+          </p>
+
+          <div className="flex items-center gap-4 mb-4">
+            {logoUrl
+              ? <img src={logoUrl} alt="Logo actual" className="h-16 w-16 rounded-xl object-cover border border-gray-200" />
+              : <div className="h-16 w-16 rounded-xl bg-gray-100 flex items-center justify-center text-2xl">💧</div>
+            }
+            <div>
+              <p className="text-xs text-gray-500 mb-2">
+                {logoUrl ? 'Logo actual (JPG, PNG o WebP, máx. 2 MB)' : 'Sin logo — se muestra 💧 por defecto'}
+              </p>
+              <label className="cursor-pointer bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold px-4 py-2 rounded-xl inline-block transition">
+                {subiendoLogo ? 'Subiendo...' : logoUrl ? 'Cambiar logo' : 'Subir logo'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={subirLogo}
+                  disabled={subiendoLogo}
+                />
+              </label>
+            </div>
+          </div>
+
+          {mensajeLogo && (
+            <p className={`text-sm rounded-xl px-3 py-2 ${
+              mensajeLogo.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+            }`}>{mensajeLogo}</p>
+          )}
         </div>
       )}
 

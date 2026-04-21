@@ -44,6 +44,8 @@ export default function RepartidorPage() {
   const [zona, setZona] = useState<{ lat: number; lng: number; radio_km: number } | null>(null)
   const [cargando, setCargando] = useState(true)
   const [nuevoPedidoId, setNuevoPedidoId] = useState<string | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [nombrePuri, setNombrePuri] = useState('Purificadora')
 
   // Modal "Entregado"
   const [entregandoPedido, setEntregandoPedido] = useState<{ id: string; cantidad: number } | null>(null)
@@ -130,13 +132,20 @@ export default function RepartidorPage() {
         await Promise.all([cargarPedidos(), cargarVentasHoy(rep.id)])
         setPushActivado(yaEstaActivado())
 
-        // Cargar zona de geocoding para validar si mostrar botón Navegar
-        const { data: cfgZona } = await supabase
-          .from('configuracion')
-          .select('valor')
-          .eq('clave', 'geocoding_zona')
-          .maybeSingle()
+        // Cargar zona, logo y nombre de purificadora
+        const puriId = session.user.user_metadata?.purificadora_id ?? ''
+        const [{ data: cfgZona }, { data: cfgLogo }, { data: puri }] = await Promise.all([
+          supabase.from('configuracion').select('valor').eq('clave', 'geocoding_zona').maybeSingle(),
+          puriId
+            ? supabase.from('configuracion').select('valor').eq('clave', 'logo_url').eq('purificadora_id', puriId).maybeSingle()
+            : Promise.resolve({ data: null }),
+          puriId
+            ? supabase.from('purificadoras').select('nombre').eq('id', puriId).maybeSingle()
+            : Promise.resolve({ data: null }),
+        ])
         if (cfgZona?.valor) setZona(cfgZona.valor as { lat: number; lng: number; radio_km: number })
+        if (cfgLogo?.valor) setLogoUrl(cfgLogo.valor as string)
+        if (puri?.nombre) setNombrePuri(puri.nombre)
 
         setCargando(false)
       } catch {
@@ -322,9 +331,15 @@ export default function RepartidorPage() {
       {/* Header fijo */}
       <header className="bg-sky-500 text-white px-4 py-3 sticky top-0 z-10 shadow-md">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-bold text-lg leading-tight">💧 Purificadora</h1>
-            <p className="text-sky-100 text-xs">{repartidor?.nombre}</p>
+          <div className="flex items-center gap-2">
+            {logoUrl
+              ? <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-cover flex-shrink-0" />
+              : <span className="text-2xl">💧</span>
+            }
+            <div>
+              <h1 className="font-bold text-lg leading-tight">{nombrePuri}</h1>
+              <p className="text-sky-100 text-xs">{repartidor?.nombre}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${

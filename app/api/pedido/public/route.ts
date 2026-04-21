@@ -17,10 +17,11 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdmin()
 
-  const [{ data: puri }, { data: cfgZona }, { data: cfgMunis }] = await Promise.all([
+  const [{ data: puri }, { data: cfgZona }, { data: cfgMunis }, { data: cfgLogo }] = await Promise.all([
     supabase.from('purificadoras').select('nombre, activo').eq('id', purificadoraId).single(),
     supabase.from('configuracion').select('valor').eq('clave', 'geocoding_zona').eq('purificadora_id', purificadoraId).maybeSingle(),
     supabase.from('configuracion').select('valor').eq('clave', 'municipios').eq('purificadora_id', purificadoraId).maybeSingle(),
+    supabase.from('configuracion').select('valor').eq('clave', 'logo_url').eq('purificadora_id', purificadoraId).maybeSingle(),
   ])
 
   if (!puri || !puri.activo) {
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
     nombre:     puri.nombre,
     zona:       (z?.lat && z?.lng) ? { lat: z.lat, lng: z.lng, radio_km: z.radio_km ?? 10 } : null,
     municipios: (cfgMunis?.valor as string[] | null) ?? [],
+    logoUrl:    (cfgLogo?.valor as string | null) ?? null,
   })
 }
 
