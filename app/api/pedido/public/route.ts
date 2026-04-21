@@ -7,13 +7,27 @@ import { estaAbierto, horarioDeHoy, HORARIO_DEFAULT, type HorarioSemana } from '
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function resolverPurificadoraId(param: string): Promise<string | null> {
+  if (UUID_RE.test(param)) return param
+  const supabase = getSupabaseAdmin()
+  const { data } = await supabase.from('purificadoras').select('id').eq('slug', param).maybeSingle()
+  return data?.id ?? null
+}
+
 // GET — devuelve nombre de la purificadora y zona de entrega (público)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const purificadoraId = searchParams.get('purificadoraId')
+  const param = searchParams.get('purificadoraId')
 
-  if (!purificadoraId) {
+  if (!param) {
     return NextResponse.json({ error: 'purificadoraId requerido' }, { status: 400 })
+  }
+
+  const purificadoraId = await resolverPurificadoraId(param)
+  if (!purificadoraId) {
+    return NextResponse.json({ error: 'Purificadora no disponible' }, { status: 404 })
   }
 
   const supabase = getSupabaseAdmin()
@@ -47,10 +61,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Datos inválidos.' }, { status: 400 })
 
-  const { purificadoraId, telefono, nombre, direccion, municipio, referencias, cantidad, lat: latCliente, lng: lngCliente } = body
+  const { purificadoraId: purificadoraParam, telefono, nombre, direccion, municipio, referencias, cantidad, lat: latCliente, lng: lngCliente } = body
 
-  if (!purificadoraId || !telefono || !nombre || !direccion || !cantidad) {
+  if (!purificadoraParam || !telefono || !nombre || !direccion || !cantidad) {
     return NextResponse.json({ error: 'Faltan datos requeridos.' }, { status: 400 })
+  }
+
+  const purificadoraId = await resolverPurificadoraId(purificadoraParam)
+  if (!purificadoraId) {
+    return NextResponse.json({ error: 'Purificadora no disponible.' }, { status: 404 })
   }
   if (typeof cantidad !== 'number' || cantidad < 1 || cantidad > 10) {
     return NextResponse.json({ error: 'Cantidad inválida (1–10).' }, { status: 400 })

@@ -26,6 +26,12 @@ export default function AdminConfiguracion() {
   const [purificadoraId, setPurificadoraId] = useState<string | null>(null)
   const [urlCopiada, setUrlCopiada]         = useState(false)
 
+  // Slug personalizado
+  const [slug,           setSlug]           = useState<string | null>(null)
+  const [slugInput,      setSlugInput]       = useState('')
+  const [guardandoSlug,  setGuardandoSlug]   = useState(false)
+  const [mensajeSlug,    setMensajeSlug]     = useState('')
+
   // Logo
   const [logoUrl,       setLogoUrl]       = useState<string | null>(null)
   const [subiendoLogo,  setSubiendoLogo]  = useState(false)
@@ -52,7 +58,7 @@ export default function AdminConfiguracion() {
         headers: { 'Authorization': `Bearer ${token}` },
       })
       if (!res.ok) return
-      const { data } = await res.json() as { data: { clave: string; valor: unknown }[] }
+      const { data, slug: slugActual } = await res.json() as { data: { clave: string; valor: unknown }[]; slug: string | null }
 
       for (const row of data) {
         if (row.clave === 'geocoding_zona') setZona(row.valor as ZonaConfig)
@@ -61,6 +67,8 @@ export default function AdminConfiguracion() {
         if (row.clave === 'logo_url')       setLogoUrl(row.valor as string)
         if (row.clave === 'horario')        setHorario(row.valor as HorarioSemana)
       }
+
+      if (slugActual) { setSlug(slugActual); setSlugInput(slugActual) }
     }
     cargar()
   }, [supabase])
@@ -179,13 +187,34 @@ export default function AdminConfiguracion() {
 
   const tieneZona = zona.lat !== null && zona.lng !== null
 
+  function urlPedidos() {
+    const identificador = slug ?? purificadoraId ?? ''
+    return `${window.location.origin}/pedido/${identificador}`
+  }
+
   function copiarUrl() {
-    if (!purificadoraId) return
-    const url = `${window.location.origin}/pedido/${purificadoraId}`
-    navigator.clipboard.writeText(url).then(() => {
+    navigator.clipboard.writeText(urlPedidos()).then(() => {
       setUrlCopiada(true)
       setTimeout(() => setUrlCopiada(false), 2500)
     })
+  }
+
+  async function guardarSlug() {
+    const val = slugInput.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
+    if (val.length < 3) { setMensajeSlug('⚠️ Mínimo 3 caracteres (letras, números o guiones)'); return }
+    setGuardandoSlug(true); setMensajeSlug('')
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token ?? ''
+    const res = await fetch('/api/admin/configuracion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ clave: 'slug', valor: val }),
+    })
+    const json = await res.json()
+    setGuardandoSlug(false)
+    if (!res.ok) { setMensajeSlug(`⚠️ ${json.error}`); return }
+    setSlug(json.slug); setSlugInput(json.slug)
+    setMensajeSlug('✅ URL personalizada guardada')
   }
 
   return (
@@ -197,29 +226,63 @@ export default function AdminConfiguracion() {
 
       {/* ── ENLACE DE PEDIDOS WEB ──────────────────────────────────────── */}
       {purificadoraId && (
-        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-5">
-          <h2 className="font-semibold text-sky-800 mb-1">🔗 Enlace de pedidos en línea</h2>
-          <p className="text-xs text-sky-600 mb-3">
-            Comparte este enlace con tus clientes para que hagan pedidos sin WhatsApp.
-          </p>
-          <div className="bg-white rounded-xl border border-sky-200 px-4 py-3 font-mono text-xs text-gray-700 break-all mb-3">
-            {typeof window !== 'undefined'
-              ? `${window.location.origin}/pedido/${purificadoraId}`
-              : `/pedido/${purificadoraId}`}
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-sky-800 mb-1">🔗 Enlace de pedidos en línea</h2>
+            <p className="text-xs text-sky-600">
+              Comparte este enlace con tus clientes para que hagan pedidos sin WhatsApp.
+            </p>
           </div>
+
+          {/* URL personalizada */}
+          <div>
+            <label className="block text-xs font-semibold text-sky-700 mb-1">
+              URL personalizada <span className="font-normal text-sky-500">(letras, números y guiones)</span>
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 flex items-center bg-white border border-sky-200 rounded-xl overflow-hidden px-3">
+                <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">
+                  {typeof window !== 'undefined' ? window.location.origin : ''}/pedido/
+                </span>
+                <input
+                  type="text"
+                  value={slugInput}
+                  onChange={e => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="mi-purificadora"
+                  className="flex-1 py-2 text-sm font-mono focus:outline-none min-w-0"
+                />
+              </div>
+              <button
+                onClick={guardarSlug}
+                disabled={guardandoSlug || slugInput.trim().length < 3}
+                className="px-4 py-2 bg-sky-500 disabled:opacity-40 hover:bg-sky-600 text-white text-sm font-semibold rounded-xl transition"
+              >
+                {guardandoSlug ? '...' : 'Guardar'}
+              </button>
+            </div>
+            {mensajeSlug && (
+              <p className={`text-xs mt-1.5 ${mensajeSlug.startsWith('✅') ? 'text-green-600' : 'text-orange-600'}`}>
+                {mensajeSlug}
+              </p>
+            )}
+          </div>
+
+          {/* URL activa */}
+          <div className="bg-white rounded-xl border border-sky-200 px-4 py-3 font-mono text-xs text-gray-700 break-all">
+            {typeof window !== 'undefined' ? urlPedidos() : ''}
+          </div>
+
           <div className="flex gap-2">
             <button
               onClick={copiarUrl}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${
-                urlCopiada
-                  ? 'bg-green-500 text-white'
-                  : 'bg-sky-500 hover:bg-sky-600 text-white'
+                urlCopiada ? 'bg-green-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white'
               }`}
             >
               {urlCopiada ? '✅ Enlace copiado' : '📋 Copiar enlace'}
             </button>
             <a
-              href={`/pedido/${purificadoraId}`}
+              href={typeof window !== 'undefined' ? urlPedidos() : '#'}
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-sky-200 text-sky-600 hover:bg-sky-50 transition"

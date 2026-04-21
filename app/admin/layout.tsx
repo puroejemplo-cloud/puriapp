@@ -26,6 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [email,          setEmail]          = useState('')
   const [userId,         setUserId]         = useState('')
   const [purificadoraId, setPurificadoraId] = useState('')
+  const [slugPuri,       setSlugPuri]       = useState<string | null>(null)
   const [logoUrl,        setLogoUrl]        = useState<string | null>(null)
   const [verificando,    setVerificando]    = useState(true)
 
@@ -50,15 +51,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setPurificadoraId(puriId)
       setPushActivo(pushAdminActivo())
 
-      // Cargar logo si existe
+      // Cargar logo y slug
       if (puriId) {
-        const { data: cfgLogo } = await supabase
-          .from('configuracion')
-          .select('valor')
-          .eq('clave', 'logo_url')
-          .eq('purificadora_id', puriId)
-          .maybeSingle()
+        const [{ data: cfgLogo }, { data: puriData }] = await Promise.all([
+          supabase.from('configuracion').select('valor').eq('clave', 'logo_url').eq('purificadora_id', puriId).maybeSingle(),
+          supabase.from('purificadoras').select('slug').eq('id', puriId).single(),
+        ])
         if (cfgLogo?.valor) setLogoUrl(cfgLogo.valor as string)
+        if (puriData?.slug) setSlugPuri(puriData.slug)
       }
 
       setVerificando(false)
@@ -90,7 +90,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   function copiarUrlPedidos() {
     if (!purificadoraId) return
-    const url = `${window.location.origin}/pedido/${purificadoraId}`
+    const identificador = slugPuri ?? purificadoraId
+    const url = `${window.location.origin}/pedido/${identificador}`
     navigator.clipboard.writeText(url).then(() => {
       setUrlCopiada(true)
       setTimeout(() => setUrlCopiada(false), 2000)
