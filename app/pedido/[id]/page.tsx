@@ -31,16 +31,18 @@ type PedidoOk   = { pedidoId: string; total: number; precio: number; cantidad: n
 export default function PedidoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: purificadoraId } = use(params)
 
-  const [nombrePuri, setNombrePuri] = useState('')
-  const [zona,       setZona]       = useState<ZonaConfig>(null)
-  const [cargando,   setCargando]   = useState(true)
+  const [nombrePuri,   setNombrePuri]   = useState('')
+  const [zona,         setZona]         = useState<ZonaConfig>(null)
+  const [municipios,   setMunicipios]   = useState<string[]>([])
+  const [cargando,     setCargando]     = useState(true)
   const [noDisponible, setNoDisponible] = useState(false)
 
   // Campos del formulario
-  const [nombre,    setNombre]    = useState('')
-  const [telefono,  setTelefono]  = useState('')
-  const [direccion, setDireccion] = useState('')
-  const [cantidad,  setCantidad]  = useState(1)
+  const [nombre,     setNombre]     = useState('')
+  const [telefono,   setTelefono]   = useState('')
+  const [direccion,  setDireccion]  = useState('')
+  const [municipio,  setMunicipio]  = useState('')
+  const [cantidad,   setCantidad]   = useState(1)
 
   // GPS
   const [lat,       setLat]       = useState<number | null>(null)
@@ -64,6 +66,7 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
         if (d.error) { setNoDisponible(true); return }
         setNombrePuri(d.nombre ?? '')
         if (d.zona) setZona(d.zona)
+        if (d.municipios?.length) setMunicipios(d.municipios)
       })
       .catch(() => setNoDisponible(true))
       .finally(() => setCargando(false))
@@ -108,6 +111,7 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
           telefono:  normalizarTelefono(telefono),
           nombre:    nombre.trim(),
           direccion: direccion.trim(),
+          municipio: municipio || null,
           cantidad,
           lat,
           lng,
@@ -239,6 +243,29 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none"
             />
           </div>
+
+          {/* Municipio / Colonia — solo si el admin configuró la lista */}
+          {municipios.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Colonia / Municipio
+              </label>
+              <select
+                value={municipio}
+                onChange={e => setMunicipio(e.target.value)}
+                required
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+              >
+                <option value="">Selecciona tu colonia…</option>
+                {municipios.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                Ayuda a encontrar tu dirección con mayor precisión.
+              </p>
+            </div>
+          )}
 
           {/* Cantidad */}
           <div>

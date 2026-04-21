@@ -17,9 +17,10 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdmin()
 
-  const [{ data: puri }, { data: cfgZona }] = await Promise.all([
+  const [{ data: puri }, { data: cfgZona }, { data: cfgMunis }] = await Promise.all([
     supabase.from('purificadoras').select('nombre, activo').eq('id', purificadoraId).single(),
     supabase.from('configuracion').select('valor').eq('clave', 'geocoding_zona').eq('purificadora_id', purificadoraId).maybeSingle(),
+    supabase.from('configuracion').select('valor').eq('clave', 'municipios').eq('purificadora_id', purificadoraId).maybeSingle(),
   ])
 
   if (!puri || !puri.activo) {
@@ -28,8 +29,9 @@ export async function GET(request: NextRequest) {
 
   const z = cfgZona?.valor
   return NextResponse.json({
-    nombre: puri.nombre,
-    zona: (z?.lat && z?.lng) ? { lat: z.lat, lng: z.lng, radio_km: z.radio_km ?? 10 } : null,
+    nombre:     puri.nombre,
+    zona:       (z?.lat && z?.lng) ? { lat: z.lat, lng: z.lng, radio_km: z.radio_km ?? 10 } : null,
+    municipios: (cfgMunis?.valor as string[] | null) ?? [],
   })
 }
 
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Datos inválidos.' }, { status: 400 })
 
-  const { purificadoraId, telefono, nombre, direccion, cantidad, lat: latCliente, lng: lngCliente } = body
+  const { purificadoraId, telefono, nombre, direccion, municipio, cantidad, lat: latCliente, lng: lngCliente } = body
 
   if (!purificadoraId || !telefono || !nombre || !direccion || !cantidad) {
     return NextResponse.json({ error: 'Faltan datos requeridos.' }, { status: 400 })
@@ -66,7 +68,9 @@ export async function POST(request: NextRequest) {
   let lng: number | null = lngCliente ?? null
 
   if (!lat || !lng) {
-    const coords = await geocodificar(direccion, zona)
+    // Si el cliente eligió municipio, se añade a la dirección para mayor precisión
+    const busqueda = municipio ? `${direccion.trim()}, ${municipio}` : direccion.trim()
+    const coords = await geocodificar(busqueda, zona)
     if (coords) { lat = coords.lat; lng = coords.lng }
   }
 

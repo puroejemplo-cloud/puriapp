@@ -25,6 +25,12 @@ export default function AdminConfiguracion() {
   const [purificadoraId, setPurificadoraId] = useState<string | null>(null)
   const [urlCopiada, setUrlCopiada]         = useState(false)
 
+  // Municipios / colonias
+  const [municipios,       setMunicipios]       = useState<string[]>([])
+  const [nuevoMunicipio,   setNuevoMunicipio]   = useState('')
+  const [guardandoMunis,   setGuardandoMunis]   = useState(false)
+  const [mensajeMunis,     setMensajeMunis]     = useState('')
+
   useEffect(() => {
     async function cargar() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -40,6 +46,7 @@ export default function AdminConfiguracion() {
       for (const row of data) {
         if (row.clave === 'geocoding_zona') setZona(row.valor as ZonaConfig)
         if (row.clave === 'precios')        setPrecios(row.valor as PreciosConfig)
+        if (row.clave === 'municipios')     setMunicipios((row.valor as string[]) ?? [])
       }
     }
     cargar()
@@ -100,6 +107,22 @@ export default function AdminConfiguracion() {
 
   async function guardarZona() {
     await guardarConfig('geocoding_zona', zona, setGZ, setMZ)
+  }
+
+  // ── Municipios ────────────────────────────────────────────────────────────
+  function agregarMunicipio() {
+    const nombre = nuevoMunicipio.trim()
+    if (!nombre || municipios.includes(nombre)) return
+    setMunicipios(m => [...m, nombre])
+    setNuevoMunicipio('')
+  }
+
+  function quitarMunicipio(nombre: string) {
+    setMunicipios(m => m.filter(x => x !== nombre))
+  }
+
+  async function guardarMunicipios() {
+    await guardarConfig('municipios', municipios, setGuardandoMunis, setMensajeMunis)
   }
 
   // ── Precios ───────────────────────────────────────────────────────────────
@@ -344,6 +367,69 @@ export default function AdminConfiguracion() {
             className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm"
           >{guardandoZona ? 'Guardando...' : 'Guardar zona'}</button>
         </div>
+      </div>
+
+      {/* ── MUNICIPIOS / COLONIAS ───────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h2 className="font-semibold text-gray-800 mb-1">🏘️ Municipios / Colonias de entrega</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          El cliente verá un menú para elegir su colonia. Se combina con su calle para
+          encontrar la dirección exacta sin necesitar GPS.
+        </p>
+
+        {/* Input agregar */}
+        <div className="flex gap-2 mb-4">
+          <input
+            type="text"
+            placeholder="Ej: Col. Centro, Fracc. Las Flores…"
+            value={nuevoMunicipio}
+            onChange={e => setNuevoMunicipio(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), agregarMunicipio())}
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+          />
+          <button
+            onClick={agregarMunicipio}
+            disabled={!nuevoMunicipio.trim()}
+            className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shrink-0"
+          >
+            + Agregar
+          </button>
+        </div>
+
+        {/* Lista */}
+        {municipios.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4 border-2 border-dashed border-gray-100 rounded-xl mb-4">
+            Sin municipios — el cliente escribirá su dirección completa
+          </p>
+        ) : (
+          <ul className="space-y-2 mb-4">
+            {municipios.map(m => (
+              <li key={m} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5">
+                <span className="text-sm text-gray-700">📍 {m}</span>
+                <button
+                  onClick={() => quitarMunicipio(m)}
+                  className="text-red-400 hover:text-red-600 text-xs font-medium"
+                >
+                  Quitar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {mensajeMunis && (
+          <p className={`text-sm rounded-xl px-3 py-2 mb-3 ${
+            mensajeMunis.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+          }`}>{mensajeMunis}</p>
+        )}
+
+        <button
+          onClick={guardarMunicipios}
+          disabled={guardandoMunis}
+          className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm"
+        >
+          {guardandoMunis ? 'Guardando...' : 'Guardar lista de municipios'}
+        </button>
       </div>
     </div>
   )
