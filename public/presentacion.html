@@ -261,6 +261,30 @@
   .price-card ul li { font-size: clamp(11px,1.4vw,13px); color: #94a3b8; padding: 4px 0; }
   .price-card ul li::before { content: '✓ '; color: #38bdf8; font-weight: 700; }
   .s8 .nota { margin-top: 20px; font-size: 12px; color: #475569; }
+  .promo-card {
+    background: rgba(56,189,248,.12) !important;
+    border-color: rgba(56,189,248,.4) !important;
+    max-width: 320px !important;
+    position: relative;
+  }
+  .promo-ribbon {
+    background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+    color: #fff; font-size: 11px; font-weight: 800;
+    letter-spacing: .06em; text-transform: uppercase;
+    padding: 5px 14px; border-radius: 99px;
+    display: inline-block; margin-bottom: 12px;
+  }
+  .price-wrap { margin: 10px 0 6px; }
+  .price-old {
+    font-size: clamp(16px,2vw,20px); font-weight: 700;
+    color: #475569; text-decoration: line-through;
+    margin-bottom: 2px;
+  }
+  .price-old span { font-size: 13px; }
+  .promo-tag {
+    font-size: 12px; color: #7dd3fc;
+    margin-bottom: 14px; line-height: 1.4;
+  }
 
   /* ════ SLIDE 9 — CTA ════ */
   .s9 {
@@ -424,30 +448,27 @@
     <h2 class="title">Un precio justo para crecer</h2>
     <p class="sub">Elige el plan que se adapta a tu operación</p>
     <div class="cards">
-      <div class="price-card">
-        <h3>Básico</h3>
-        <div class="price">$X,XXX <span>/mes</span></div>
+      <div class="price-card promo-card">
+        <div class="promo-ribbon">🎉 PROMO INICIO</div>
+        <h3>Todo incluido</h3>
+        <div class="price-wrap">
+          <div class="price-old">$X,XXX <span>/mes</span></div>
+          <div class="price">$500 <span>/mes</span></div>
+        </div>
+        <div class="promo-tag">Precio especial por inicio de actividades</div>
         <ul>
           <li>WhatsApp automatizado</li>
-          <li>App del repartidor (hasta 3)</li>
-          <li>Panel de administración</li>
-          <li>Soporte por WhatsApp</li>
-        </ul>
-      </div>
-      <div class="price-card featured">
-        <h3>Completo ⭐</h3>
-        <div class="price">$X,XXX <span>/mes</span></div>
-        <ul>
-          <li>Todo el plan Básico</li>
-          <li>Repartidores ilimitados</li>
+          <li>App del repartidor (ilimitados)</li>
           <li>App de rellenadora</li>
+          <li>Panel de administración completo</li>
           <li>Mapa en vivo</li>
           <li>Reportes avanzados</li>
           <li>Soporte prioritario</li>
+          <li>Configuración sin costo</li>
         </ul>
       </div>
     </div>
-    <p class="nota">* Precios en MXN. Incluye configuración inicial sin costo adicional.</p>
+    <p class="nota">* Precio en MXN. Promo válida para nuevos clientes. Sin permanencia forzosa.</p>
   </div>
 
   <!-- 9 -->
