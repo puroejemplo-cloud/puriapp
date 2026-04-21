@@ -47,6 +47,26 @@ async function buscarEnNominatim(q: string, extra: Record<string, string> = {}):
   }
 }
 
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+): Promise<{ municipio: string | null; colonia: string | null }> {
+  try {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lng), format: 'json', addressdetails: '1' })
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`, {
+      headers: { 'User-Agent': 'PurificadoraApp/1.0' },
+    })
+    if (!res.ok) return { municipio: null, colonia: null }
+    const data = await res.json()
+    const addr = data.address ?? {}
+    const municipio: string | null = addr.city ?? addr.town ?? addr.municipality ?? addr.county ?? null
+    const colonia:   string | null = addr.suburb ?? addr.neighbourhood ?? addr.city_district ?? null
+    return { municipio, colonia }
+  } catch {
+    return { municipio: null, colonia: null }
+  }
+}
+
 export async function geocodificar(
   direccion: string,
   zona?: ZonaGeocoding | null

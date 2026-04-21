@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { geocodificar } from '@/lib/geocoding'
+import { geocodificar, reverseGeocode } from '@/lib/geocoding'
 import { distanciaKm } from '@/lib/distancia'
 
 export const runtime = 'nodejs'
@@ -88,6 +88,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Reverse geocoding para obtener colonia desde coordenadas GPS
+  let coloniaGeo: string | null = null
+  if (lat && lng) {
+    const geo = await reverseGeocode(lat, lng)
+    coloniaGeo = geo.colonia
+  }
+
   const tel = telefono.trim()
 
   // Buscar cliente existente de esta purificadora
@@ -101,13 +108,19 @@ export async function POST(request: NextRequest) {
     await supabase.from('clientes').update({
       nombre:    nombre.trim(),
       direccion: direccion.trim(),
-      ...(lat && lng ? { lat, lng } : {}),
+      ...(municipio  ? { municipio }          : {}),
+      ...(coloniaGeo ? { colonia: coloniaGeo } : {}),
+      ...(lat && lng ? { lat, lng }            : {}),
     }).eq('id', clienteExistente.id)
     clienteId = clienteExistente.id
   } else {
     const { data: nuevo, error } = await supabase
       .from('clientes')
-      .insert({ telefono: tel, nombre: nombre.trim(), direccion: direccion.trim(), lat, lng, purificadora_id: purificadoraId })
+      .insert({
+        telefono: tel, nombre: nombre.trim(), direccion: direccion.trim(),
+        municipio: municipio ?? null, colonia: coloniaGeo,
+        lat, lng, purificadora_id: purificadoraId,
+      })
       .select('id').single()
     if (error || !nuevo) {
       return NextResponse.json({ error: 'Error al registrar. Intenta de nuevo.' }, { status: 500 })
