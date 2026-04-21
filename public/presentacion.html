@@ -362,21 +362,21 @@
 
   <!-- 4 -->
   <div class="slide s4" id="s4">
-    <div class="tag">Automatización WhatsApp</div>
-    <h2 class="title">El cliente pide, el sistema trabaja</h2>
-    <p class="sub">Sin operadores, sin errores, sin demoras</p>
+    <div class="tag">Pedido en línea</div>
+    <h2 class="title">Pedir agua nunca fue tan fácil</h2>
+    <p class="sub">Tu cliente pide desde su celular en menos de 30 segundos, sin instalar nada</p>
     <div class="flow">
-      <div class="wa-step"><div class="num">1</div><p>Cliente manda <strong style="color:#fff">"PEDIDO 3"</strong> por WhatsApp</p></div>
+      <div class="wa-step"><div class="num">1</div><p>Tú compartes tu <strong style="color:#fff">link de pedidos</strong> por WhatsApp, redes o tarjeta</p></div>
       <div class="wa-arr">→</div>
-      <div class="wa-step"><div class="num">2</div><p>Sistema crea el pedido y geocodifica la dirección</p></div>
+      <div class="wa-step"><div class="num">2</div><p>Cliente abre el link en su celular y llena un formulario simple</p></div>
       <div class="wa-arr">→</div>
-      <div class="wa-step"><div class="num">3</div><p>Repartidor recibe notificación push al instante</p></div>
+      <div class="wa-step"><div class="num">3</div><p>Pedido creado al instante — confirmación en pantalla y por WhatsApp</p></div>
       <div class="wa-arr">→</div>
-      <div class="wa-step"><div class="num">4</div><p>Navega con GPS al domicilio del cliente</p></div>
+      <div class="wa-step"><div class="num">4</div><p>Repartidor recibe <strong style="color:#fff">notificación push</strong> y navega al domicilio</p></div>
       <div class="wa-arr">→</div>
-      <div class="wa-step"><div class="num">5</div><p>Cliente recibe confirmación de entrega</p></div>
+      <div class="wa-step"><div class="num">5</div><p>Cliente rastrea su pedido en tiempo real desde el mismo link</p></div>
     </div>
-    <p class="extras">✓ Alta de cliente &nbsp;✓ Consulta de estado &nbsp;✓ Cancelación &nbsp;✓ Dirección por GPS — todo por WhatsApp</p>
+    <p class="extras">✓ Sin app &nbsp;✓ Sin registro previo &nbsp;✓ Funciona en cualquier celular &nbsp;✓ También acepta pedidos por WhatsApp</p>
   </div>
 
   <!-- 5 -->
@@ -476,7 +476,7 @@
     <h1>¿Listo para modernizar<br/>tu <span>purificadora</span>?</h1>
     <p>Arrancamos esta semana. Sin contratos largos, sin hardware, sin complicaciones.</p>
     <div class="cta-btns">
-      <button class="btn-p">📱 Ver demo en vivo</button>
+      <button class="btn-p" onclick="abrirDemo()">📱 Ver demo en vivo</button>
       <button class="btn-s">💬 Hablar por WhatsApp</button>
     </div>
     <div class="garantias">
@@ -524,6 +524,13 @@
     if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next() }
     if (e.key === 'ArrowLeft') { e.preventDefault(); prev() }
   })
+
+  function abrirDemo() {
+    // Abre la página pública de pedidos en una nueva pestaña
+    // El admin puede mostrarla en vivo al cliente durante la presentación
+    const base = window.location.origin
+    window.open(base + '/pedido', '_blank')
+  }
 
   let tx = 0, ty = 0
   document.addEventListener('touchstart', e => {
