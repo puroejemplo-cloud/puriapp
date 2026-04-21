@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Sistema de Gestión — Purificadora</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --pad: clamp(20px, 5vw, 80px);
+    --pad-y: clamp(24px, 5vh, 60px);
+  }
+
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    height: 100%;
+    overflow: hidden;
+    touch-action: pan-y;
+  }
+
+  .slides { width: 100%; height: 100dvh; position: relative; }
+
+  .slide {
+    display: none;
+    position: absolute;
+    inset: 0;
+    padding: var(--pad-y) var(--pad) 80px;
+    flex-direction: column;
+    justify-content: center;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    animation: fadeIn .35s ease;
+  }
+  .slide.active { display: flex; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255,255,255,.09);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 99px;
+    padding: 8px 20px;
+    z-index: 100;
+  }
+  .nav button {
+    background: none; border: none;
+    color: #94a3b8; cursor: pointer;
+    font-size: 20px; padding: 4px 10px;
+    border-radius: 8px; transition: all .2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav button:active { background: rgba(255,255,255,.12); color: #fff; }
+  .nav .counter { color: #64748b; font-size: 13px; min-width: 46px; text-align: center; }
+
+  /* ── DOTS ── */
+  .dots {
+    position: fixed;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+  }
+  @media (max-width: 480px) { .dots { display: none; } }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #334155;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .dot.active { background: #38bdf8; transform: scale(1.6); }
+
+  /* ── UTIL ── */
+  .tag {
+    display: inline-block;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: #38bdf8; margin-bottom: 10px;
+  }
+  h2.title {
+    font-size: clamp(24px, 4vw, 42px);
+    font-weight: 800; line-height: 1.1; margin-bottom: 4px;
+  }
+  .sub { font-size: clamp(13px, 2vw, 17px); color: #64748b; }
+
+  /* ════ SLIDE 1 — PORTADA ════ */
+  .s1 {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0c4a6e 100%);
+    align-items: center; text-align: center;
+  }
+  .s1 .logo { font-size: clamp(48px, 10vw, 72px); margin-bottom: 12px; }
+  .s1 h1 {
+    font-size: clamp(28px, 6vw, 52px);
+    font-weight: 900; line-height: 1.1; margin-bottom: 14px;
+  }
+  .s1 h1 span { color: #38bdf8; }
+  .s1 p { font-size: clamp(14px, 2vw, 20px); color: #94a3b8; max-width: 520px; line-height: 1.6; }
+  .s1 .badge {
+    margin-top: 28px;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(56,189,248,.15);
+    border: 1px solid rgba(56,189,248,.3);
+    border-radius: 99px; padding: 8px 18px;
+    font-size: 13px; color: #7dd3fc;
+  }
+
+  /* ════ SLIDE 2 — PROBLEMA ════ */
+  .s2 { background: linear-gradient(135deg, #1a0a2e 0%, #0f172a 100%); }
+  .s2 .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px; margin-top: 24px;
+  }
+  @media (max-width: 500px) { .s2 .grid { grid-template-columns: 1fr; } }
+  .prob {
+    background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.2);
+    border-radius: 18px; padding: clamp(16px,3vw,28px);
+  }
+  .prob .icon { font-size: clamp(24px,4vw,32px); margin-bottom: 8px; }
+  .prob h3 { font-size: clamp(13px,2vw,16px); font-weight: 700; color: #fca5a5; margin-bottom: 6px; }
+  .prob p { font-size: clamp(12px,1.5vw,14px); color: #94a3b8; line-height: 1.5; }
+
+  /* ════ SLIDE 3 — SOLUCIÓN ════ */
+  .s3 { background: linear-gradient(135deg, #0f2a1a 0%, #0f172a 100%); }
+  .s3 .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px; margin-top: 24px;
+  }
+  @media (max-width: 700px) { .s3 .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 420px) { .s3 .grid { grid-template-columns: 1fr; } }
+  .sol {
+    background: rgba(34,197,94,.08);
+    border: 1px solid rgba(34,197,94,.2);
+    border-radius: 18px; padding: clamp(14px,2.5vw,24px);
+  }
+  .sol .icon { font-size: clamp(22px,3.5vw,32px); margin-bottom: 8px; }
+  .sol h3 { font-size: clamp(12px,1.8vw,15px); font-weight: 700; color: #86efac; margin-bottom: 6px; }
+  .sol p { font-size: clamp(11px,1.4vw,13px); color: #94a3b8; line-height: 1.5; }
+
+  /* ════ SLIDE 4 — WHATSAPP ════ */
+  .s4 { background: linear-gradient(135deg, #0a1f0a 0%, #0f172a 100%); }
+  .s4 .flow {
+    display: flex; align-items: stretch;
+    gap: 10px; margin-top: 24px; flex-wrap: wrap;
+  }
+  .wa-step {
+    flex: 1; min-width: 130px;
+    background: rgba(37,211,102,.08);
+    border: 1px solid rgba(37,211,102,.2);
+    border-radius: 18px; padding: clamp(14px,2vw,24px);
+    text-align: center;
+  }
+  .wa-step .num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #25d366; color: #000;
+    font-weight: 800; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 10px;
+  }
+  .wa-step p { font-size: clamp(11px,1.5vw,13px); color: #94a3b8; line-height: 1.5; }
+  .wa-arr { color: #25d366; font-size: 20px; align-self: center; flex-shrink: 0; }
+  @media (max-width: 600px) { .wa-arr { display: none; } }
+  .s4 .extras { margin-top: 20px; font-size: clamp(11px,1.5vw,13px); color: #4ade80; }
+
+  /* ════ SLIDE 5 — PWA ════ */
+  .s5 { background: linear-gradient(135deg, #0a0f2a 0%, #0f172a 100%); }
+  .s5 .grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 18px; margin-top: 24px;
+  }
+  @media (max-width: 560px) { .s5 .grid { grid-template-columns: 1fr; } }
+  .pwa {
+    background: rgba(99,102,241,.08);
+    border: 1px solid rgba(99,102,241,.2);
+    border-radius: 18px; padding: clamp(16px,2.5vw,28px);
+  }
+  .pwa h3 { font-size: clamp(13px,2vw,16px); font-weight: 700; color: #a5b4fc; margin-bottom: 10px; }
+  .pwa ul { list-style: none; }
+  .pwa ul li { font-size: clamp(11px,1.5vw,13px); color: #94a3b8; padding: 3px 0; }
+  .pwa ul li::before { content: '✓ '; color: #818cf8; font-weight: 700; }
+
+  /* ════ SLIDE 6 — ADMIN ════ */
+  .s6 { background: linear-gradient(135deg, #0f1a2e 0%, #0f172a 100%); }
+  .s6 .grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 12px; margin-top: 24px;
+  }
+  @media (max-width: 700px) { .s6 .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 380px) { .s6 .grid { grid-template-columns: repeat(2, 1fr); } }
+  .adm {
+    background: rgba(56,189,248,.07);
+    border: 1px solid rgba(56,189,248,.15);
+    border-radius: 14px; padding: clamp(12px,2vw,20px);
+    text-align: center;
+  }
+  .adm .icon { font-size: clamp(20px,3vw,28px); margin-bottom: 6px; }
+  .adm h3 { font-size: clamp(11px,1.5vw,13px); font-weight: 700; color: #7dd3fc; margin-bottom: 3px; }
+  .adm p { font-size: clamp(10px,1.2vw,12px); color: #64748b; line-height: 1.4; }
+
+  /* ════ SLIDE 7 — MÉTRICAS ════ */
+  .s7 { background: linear-gradient(135deg, #0f172a 0%, #1c1a0f 100%); }
+  .s7 .grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 16px; margin-top: 24px;
+  }
+  @media (max-width: 600px) { .s7 .grid { grid-template-columns: repeat(2, 1fr); } }
+  .met {
+    text-align: center;
+    background: rgba(251,191,36,.06);
+    border: 1px solid rgba(251,191,36,.15);
+    border-radius: 18px; padding: clamp(16px,2.5vw,32px) 12px;
+  }
+  .met .num { font-size: clamp(28px,5vw,48px); font-weight: 900; color: #fbbf24; line-height: 1; }
+  .met .unit { font-size: clamp(12px,1.5vw,16px); color: #fbbf24; font-weight: 700; }
+  .met p { font-size: clamp(10px,1.2vw,12px); color: #94a3b8; margin-top: 6px; line-height: 1.4; }
+
+  /* ════ SLIDE 8 — PRECIO ════ */
+  .s8 {
+    background: linear-gradient(135deg, #0f172a 0%, #0c2a2a 100%);
+    align-items: center; text-align: center;
+  }
+  .s8 .cards {
+    display: flex; gap: 20px; margin-top: 28px; justify-content: center; flex-wrap: wrap;
+  }
+  .price-card {
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 22px; padding: clamp(24px,4vw,40px) clamp(20px,3vw,36px);
+    min-width: 200px; flex: 1; max-width: 260px;
+  }
+  .price-card.featured {
+    background: rgba(56,189,248,.12);
+    border-color: rgba(56,189,248,.4);
+    transform: scale(1.03);
+  }
+  .price-card h3 { font-size: clamp(13px,2vw,16px); font-weight: 700; color: #38bdf8; margin-bottom: 10px; }
+  .price-card .price { font-size: clamp(28px,4vw,44px); font-weight: 900; color: #fff; }
+  .price-card .price span { font-size: 16px; color: #94a3b8; }
+  .price-card ul { list-style: none; text-align: left; margin-top: 16px; }
+  .price-card ul li { font-size: clamp(11px,1.4vw,13px); color: #94a3b8; padding: 4px 0; }
+  .price-card ul li::before { content: '✓ '; color: #38bdf8; font-weight: 700; }
+  .s8 .nota { margin-top: 20px; font-size: 12px; color: #475569; }
+
+  /* ════ SLIDE 9 — CTA ════ */
+  .s9 {
+    background: linear-gradient(135deg, #0c2a3f 0%, #0f172a 50%, #0a1f0a 100%);
+    align-items: center; text-align: center;
+  }
+  .s9 h1 {
+    font-size: clamp(26px,6vw,54px);
+    font-weight: 900; line-height: 1.1; margin-bottom: 16px;
+  }
+  .s9 h1 span { color: #38bdf8; }
+  .s9 > p { font-size: clamp(14px,2vw,19px); color: #94a3b8; max-width: 500px; line-height: 1.6; margin-bottom: 32px; }
+  .cta-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn-p {
+    background: #0ea5e9; color: #fff;
+    border: none; border-radius: 14px;
+    padding: 14px 28px; font-size: clamp(13px,2vw,16px); font-weight: 700;
+    cursor: pointer; transition: all .2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-p:active { background: #38bdf8; transform: scale(.97); }
+  .btn-s {
+    background: rgba(255,255,255,.08); color: #94a3b8;
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 14px; padding: 14px 28px;
+    font-size: clamp(13px,2vw,16px); font-weight: 600;
+    cursor: pointer; transition: all .2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-s:active { background: rgba(255,255,255,.14); color: #fff; }
+  .garantias {
+    margin-top: 32px; display: flex; gap: clamp(12px,3vw,40px);
+    color: #475569; font-size: clamp(11px,1.5vw,14px); flex-wrap: wrap; justify-content: center;
+  }
+</style>
+</head>
+<body>
+<div class="slides">
+
+  <!-- 1 -->
+  <div class="slide s1 active" id="s1">
+    <div class="logo">💧</div>
+    <h1>Gestión inteligente<br/>para tu <span>purificadora</span></h1>
+    <p>Pedidos por WhatsApp, rutas en tiempo real, rellenadora conectada y control total desde el celular.</p>
+    <div class="badge">🚀 Sistema listo para operar hoy</div>
+  </div>
+
+  <!-- 2 -->
+  <div class="slide s2" id="s2">
+    <div class="tag">El problema actual</div>
+    <h2 class="title">¿Te identificas con esto?</h2>
+    <p class="sub">Lo que frena a la mayoría de purificadoras hoy</p>
+    <div class="grid">
+      <div class="prob"><div class="icon">📞</div><h3>Pedidos perdidos</h3><p>Llamadas sin contestar, mensajes olvidados, clientes que se van con la competencia.</p></div>
+      <div class="prob"><div class="icon">🗺️</div><h3>Repartidores sin guía</h3><p>No saben a quién entregar primero y regresan con garrafones sin entregar.</p></div>
+      <div class="prob"><div class="icon">📋</div><h3>Inventario a ciegas</h3><p>No sabes cuántos garrafones salieron, cuántos se rellenaron ni dónde están los prestados.</p></div>
+      <div class="prob"><div class="icon">💸</div><h3>Sin control de ingresos</h3><p>Fin del día y no sabes cuánto entró, qué repartidor vendió más ni qué clientes deben.</p></div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="slide s3" id="s3">
+    <div class="tag">La solución</div>
+    <h2 class="title">Todo conectado, en tiempo real</h2>
+    <p class="sub">Hecho específicamente para purificadoras de agua</p>
+    <div class="grid">
+      <div class="sol"><div class="icon">💬</div><h3>Pedidos por WhatsApp</h3><p>El cliente manda un mensaje y el pedido aparece automáticamente, sin que hagas nada.</p></div>
+      <div class="sol"><div class="icon">📱</div><h3>App del repartidor</h3><p>PWA en el celular, pedidos ordenados por distancia, navegación con un toque.</p></div>
+      <div class="sol"><div class="icon">🏭</div><h3>Control de rellenadora</h3><p>Turnos, stock y entregas a repartidores registrados al momento.</p></div>
+      <div class="sol"><div class="icon">📊</div><h3>Panel de admin</h3><p>Pedidos, rutas, ventas, clientes y reportes desde cualquier dispositivo.</p></div>
+      <div class="sol"><div class="icon">🔔</div><h3>Notificaciones push</h3><p>Cada pedido nuevo llega al repartidor al instante, sin estar en la app.</p></div>
+      <div class="sol"><div class="icon">🗺️</div><h3>Mapa en vivo</h3><p>Todos los pedidos pendientes sobre el mapa. Detecta zonas de alta demanda.</p></div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="slide s4" id="s4">
+    <div class="tag">Automatización WhatsApp</div>
+    <h2 class="title">El cliente pide, el sistema trabaja</h2>
+    <p class="sub">Sin operadores, sin errores, sin demoras</p>
+    <div class="flow">
+      <div class="wa-step"><div class="num">1</div><p>Cliente manda <strong style="color:#fff">"PEDIDO 3"</strong> por WhatsApp</p></div>
+      <div class="wa-arr">→</div>
+      <div class="wa-step"><div class="num">2</div><p>Sistema crea el pedido y geocodifica la dirección</p></div>
+      <div class="wa-arr">→</div>
+      <div class="wa-step"><div class="num">3</div><p>Repartidor recibe notificación push al instante</p></div>
+      <div class="wa-arr">→</div>
+      <div class="wa-step"><div class="num">4</div><p>Navega con GPS al domicilio del cliente</p></div>
+      <div class="wa-arr">→</div>
+      <div class="wa-step"><div class="num">5</div><p>Cliente recibe confirmación de entrega</p></div>
+    </div>
+    <p class="extras">✓ Alta de cliente &nbsp;✓ Consulta de estado &nbsp;✓ Cancelación &nbsp;✓ Dirección por GPS — todo por WhatsApp</p>
+  </div>
+
+  <!-- 5 -->
+  <div class="slide s5" id="s5">
+    <div class="tag">Aplicaciones móviles</div>
+    <h2 class="title">Una app para cada rol</h2>
+    <p class="sub">Se instala en el celular como app nativa — sin App Store, sin costo extra</p>
+    <div class="grid">
+      <div class="pwa">
+        <h3>🚚 App del Repartidor</h3>
+        <ul>
+          <li>Lista ordenada por distancia</li>
+          <li>Navegación con un toque</li>
+          <li>Registro de venta en ruta</li>
+          <li>Estado en tiempo real</li>
+          <li>Notificaciones de pedidos</li>
+          <li>Funciona sin conexión estable</li>
+        </ul>
+      </div>
+      <div class="pwa">
+        <h3>🏭 App de Rellenadora</h3>
+        <ul>
+          <li>Apertura y cierre de turno</li>
+          <li>Stock de garrafones en vivo</li>
+          <li>Entregas a repartidores</li>
+          <li>Recepción de vacíos</li>
+          <li>Aceptar pedidos de WhatsApp</li>
+          <li>Historial de movimientos</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 -->
+  <div class="slide s6" id="s6">
+    <div class="tag">Panel de administración</div>
+    <h2 class="title">Control total desde cualquier dispositivo</h2>
+    <p class="sub">Celular, tablet o computadora — en tiempo real</p>
+    <div class="grid">
+      <div class="adm"><div class="icon">📦</div><h3>Pedidos</h3><p>Ver y gestionar todos en curso</p></div>
+      <div class="adm"><div class="icon">👥</div><h3>Clientes</h3><p>Historial, dirección y garrafones prestados</p></div>
+      <div class="adm"><div class="icon">🛣️</div><h3>Ventas ruta</h3><p>Espontáneas + pedidos por repartidor</p></div>
+      <div class="adm"><div class="icon">🗺️</div><h3>Mapa en vivo</h3><p>Pedidos pendientes sobre el mapa</p></div>
+      <div class="adm"><div class="icon">💰</div><h3>Contabilidad</h3><p>Ingresos por día, semana o mes</p></div>
+      <div class="adm"><div class="icon">📈</div><h3>Reportes</h3><p>Tendencias y zonas de alta demanda</p></div>
+      <div class="adm"><div class="icon">👤</div><h3>Usuarios</h3><p>Alta con credenciales automáticas</p></div>
+      <div class="adm"><div class="icon">⚙️</div><h3>Config</h3><p>Precios, zona, horarios y notifs</p></div>
+    </div>
+  </div>
+
+  <!-- 7 -->
+  <div class="slide s7" id="s7">
+    <div class="tag">Impacto en tu negocio</div>
+    <h2 class="title">Números que importan</h2>
+    <p class="sub">Lo que logran nuestros clientes al adoptar el sistema</p>
+    <div class="grid">
+      <div class="met"><div class="num">0</div><div class="unit">pedidos perdidos</div><p>Cada WhatsApp se convierte en pedido automáticamente</p></div>
+      <div class="met"><div class="num">+30%</div><div class="unit">más entregas</div><p>Ruta optimizada por distancia, más paradas en el mismo tiempo</p></div>
+      <div class="met"><div class="num">5 min</div><div class="unit">para arrancar</div><p>Alta de repartidores y el sistema opera el mismo día</p></div>
+      <div class="met"><div class="num">100%</div><div class="unit">visibilidad</div><p>Garrafones, cobros y clientes — todo en tiempo real</p></div>
+      <div class="met"><div class="num">24/7</div><div class="unit">en la nube</div><p>Recibe pedidos aunque nadie esté en la oficina</p></div>
+      <div class="met"><div class="num">$0</div><div class="unit">hardware extra</div><p>Solo el celular que ya tienen tus empleados</p></div>
+    </div>
+  </div>
+
+  <!-- 8 -->
+  <div class="slide s8" id="s8">
+    <div class="tag">Inversión</div>
+    <h2 class="title">Un precio justo para crecer</h2>
+    <p class="sub">Elige el plan que se adapta a tu operación</p>
+    <div class="cards">
+      <div class="price-card">
+        <h3>Básico</h3>
+        <div class="price">$X,XXX <span>/mes</span></div>
+        <ul>
+          <li>WhatsApp automatizado</li>
+          <li>App del repartidor (hasta 3)</li>
+          <li>Panel de administración</li>
+          <li>Soporte por WhatsApp</li>
+        </ul>
+      </div>
+      <div class="price-card featured">
+        <h3>Completo ⭐</h3>
+        <div class="price">$X,XXX <span>/mes</span></div>
+        <ul>
+          <li>Todo el plan Básico</li>
+          <li>Repartidores ilimitados</li>
+          <li>App de rellenadora</li>
+          <li>Mapa en vivo</li>
+          <li>Reportes avanzados</li>
+          <li>Soporte prioritario</li>
+        </ul>
+      </div>
+    </div>
+    <p class="nota">* Precios en MXN. Incluye configuración inicial sin costo adicional.</p>
+  </div>
+
+  <!-- 9 -->
+  <div class="slide s9" id="s9">
+    <h1>¿Listo para modernizar<br/>tu <span>purificadora</span>?</h1>
+    <p>Arrancamos esta semana. Sin contratos largos, sin hardware, sin complicaciones.</p>
+    <div class="cta-btns">
+      <button class="btn-p">📱 Ver demo en vivo</button>
+      <button class="btn-s">💬 Hablar por WhatsApp</button>
+    </div>
+    <div class="garantias">
+      <span>✓ Configuración el mismo día</span>
+      <span>✓ Sin permanencia</span>
+      <span>✓ Soporte incluido</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="dots" id="dots"></div>
+
+<div class="nav">
+  <button onclick="prev()" aria-label="anterior">←</button>
+  <span class="counter" id="counter">1 / 9</span>
+  <button onclick="next()" aria-label="siguiente">→</button>
+</div>
+
+<script>
+  const TOTAL = 9
+  let cur = 1
+
+  const dotsEl = document.getElementById('dots')
+  for (let i = 1; i <= TOTAL; i++) {
+    const d = document.createElement('div')
+    d.className = 'dot' + (i === 1 ? ' active' : '')
+    d.onclick = () => go(i)
+    dotsEl.appendChild(d)
+  }
+
+  function go(n) {
+    document.getElementById('s' + cur).classList.remove('active')
+    dotsEl.children[cur - 1].classList.remove('active')
+    cur = Math.max(1, Math.min(TOTAL, n))
+    document.getElementById('s' + cur).classList.add('active')
+    dotsEl.children[cur - 1].classList.add('active')
+    document.getElementById('counter').textContent = cur + ' / ' + TOTAL
+  }
+
+  function next() { go(cur + 1) }
+  function prev() { go(cur - 1) }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next() }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); prev() }
+  })
+
+  let tx = 0, ty = 0
+  document.addEventListener('touchstart', e => {
+    tx = e.touches[0].clientX
+    ty = e.touches[0].clientY
+  }, { passive: true })
+  document.addEventListener('touchend', e => {
+    const dx = tx - e.changedTouches[0].clientX
+    const dy = Math.abs(ty - e.changedTouches[0].clientY)
+    if (Math.abs(dx) > 50 && dy < 60) dx > 0 ? next() : prev()
+  }, { passive: true })
+</script>
+</body>
+</html>
