@@ -1,4 +1,4 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { parsearComando, MENSAJE_AYUDA } from '@/lib/comandos'
 import { geocodificar, reverseGeocode } from '@/lib/geocoding'
 import { estaAbierto, horarioDeHoy, HORARIO_DEFAULT, type HorarioSemana } from '@/lib/horario'
@@ -14,15 +14,31 @@ export async function POST(request: NextRequest) {
     import('@/lib/supabase'),
   ])
   const twilio = twilioMod.default
-  const supabaseAdmin = getSupabaseAdmin()
-  const formData = await request.formData()
 
-  const telefono = (formData.get('From') as string ?? '').replace('whatsapp:', '')
-  const cuerpo   = (formData.get('Body') as string ?? '').trim()
+  // Validar que la solicitud viene realmente de Twilio
+  const authToken  = process.env.TWILIO_AUTH_TOKEN ?? ''
+  const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const twilioSig  = request.headers.get('x-twilio-signature') ?? ''
+  const webhookUrl = `${appUrl}/api/whatsapp`
+
+  // Leer body como texto para validar firma, luego parsear
+  const rawBody = await request.text()
+  const params  = Object.fromEntries(new URLSearchParams(rawBody))
+
+  const valid = twilio.validateRequest(authToken, twilioSig, webhookUrl, params)
+  if (!valid) {
+    return NextResponse.json({ error: 'Firma inválida' }, { status: 403 })
+  }
+
+  const supabaseAdmin = getSupabaseAdmin()
+  const formData = new URLSearchParams(rawBody)
+
+  const telefono = (formData.get('From') ?? '').replace('whatsapp:', '')
+  const cuerpo   = (formData.get('Body') ?? '').trim()
 
   // Twilio envía Latitude y Longitude cuando el cliente comparte su ubicación
-  const latStr = formData.get('Latitude')  as string | null
-  const lngStr = formData.get('Longitude') as string | null
+  const latStr = formData.get('Latitude')  ?? null
+  const lngStr = formData.get('Longitude') ?? null
   const esUbicacion = !!latStr && !!lngStr
 
   await supabaseAdmin.from('whatsapp_log').insert({ telefono, mensaje: cuerpo || '[ubicación]', direccion: 'in' })
