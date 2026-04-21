@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { crearClienteBrowser } from '@/lib/supabase-browser'
+import { type HorarioSemana, NOMBRES_DIAS, ORDEN_DIAS, HORARIO_DEFAULT } from '@/lib/horario'
 
 type ZonaConfig   = { lat: number | null; lng: number | null; radio_km: number; ciudad?: string }
 type PreciosConfig = { pedido: number; ruta: number }
@@ -36,6 +37,11 @@ export default function AdminConfiguracion() {
   const [guardandoMunis,   setGuardandoMunis]   = useState(false)
   const [mensajeMunis,     setMensajeMunis]     = useState('')
 
+  // Horario
+  const [horario,         setHorario]         = useState<HorarioSemana>(HORARIO_DEFAULT)
+  const [guardandoHorario,setGuardandoHorario] = useState(false)
+  const [mensajeHorario,  setMensajeHorario]  = useState('')
+
   useEffect(() => {
     async function cargar() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -53,6 +59,7 @@ export default function AdminConfiguracion() {
         if (row.clave === 'precios')        setPrecios(row.valor as PreciosConfig)
         if (row.clave === 'municipios')     setMunicipios((row.valor as string[]) ?? [])
         if (row.clave === 'logo_url')       setLogoUrl(row.valor as string)
+        if (row.clave === 'horario')        setHorario(row.valor as HorarioSemana)
       }
     }
     cargar()
@@ -113,6 +120,10 @@ export default function AdminConfiguracion() {
 
   async function guardarZona() {
     await guardarConfig('geocoding_zona', zona, setGZ, setMZ)
+  }
+
+  async function guardarHorario() {
+    await guardarConfig('horario', horario, setGuardandoHorario, setMensajeHorario)
   }
 
   // ── Logo ──────────────────────────────────────────────────────────────────
@@ -497,6 +508,73 @@ export default function AdminConfiguracion() {
           className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm"
         >
           {guardandoMunis ? 'Guardando...' : 'Guardar lista de municipios'}
+        </button>
+      </div>
+
+      {/* ── HORARIO DE ATENCIÓN ─────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h2 className="font-semibold text-gray-800 mb-1">🕐 Horario de atención</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Fuera de este horario no se aceptarán pedidos en línea ni por WhatsApp.
+          Deja un día vacío si no hay servicio ese día.
+        </p>
+
+        <div className="space-y-2 mb-4">
+          {ORDEN_DIAS.map(dia => {
+            const h = horario[dia]
+            return (
+              <div key={dia} className="flex items-center gap-3">
+                <div className="w-24 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`dia-${dia}`}
+                    checked={!!h}
+                    onChange={e => setHorario(prev => ({
+                      ...prev,
+                      [dia]: e.target.checked ? { inicio: '08:00', fin: '18:00' } : null,
+                    }))}
+                    className="accent-sky-500 w-4 h-4 shrink-0"
+                  />
+                  <label htmlFor={`dia-${dia}`} className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                    {NOMBRES_DIAS[dia]}
+                  </label>
+                </div>
+                {h ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="time"
+                      value={h.inicio}
+                      onChange={e => setHorario(prev => ({ ...prev, [dia]: { ...h, inicio: e.target.value } }))}
+                      className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                    <span className="text-gray-400 text-sm">–</span>
+                    <input
+                      type="time"
+                      value={h.fin}
+                      onChange={e => setHorario(prev => ({ ...prev, [dia]: { ...h, fin: e.target.value } }))}
+                      className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-300 italic">Cerrado</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {mensajeHorario && (
+          <p className={`text-sm rounded-xl px-3 py-2 mb-3 ${
+            mensajeHorario.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+          }`}>{mensajeHorario}</p>
+        )}
+
+        <button
+          onClick={guardarHorario}
+          disabled={guardandoHorario}
+          className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm"
+        >
+          {guardandoHorario ? 'Guardando...' : 'Guardar horario'}
         </button>
       </div>
     </div>

@@ -14,7 +14,7 @@ type Pedido = {
   notas:         string | null
   origen:        string | null
   created_at:    string
-  clientes:      { nombre: string; telefono: string; direccion: string; lat: number | null; lng: number | null; municipio: string | null; colonia: string | null } | null
+  clientes:      { nombre: string; telefono: string; direccion: string; lat: number | null; lng: number | null; municipio: string | null; colonia: string | null; referencias: string | null } | null
   repartidores:  { nombre: string; lat: number | null; lng: number | null; ultima_ubicacion: string | null } | null
 }
 
@@ -77,7 +77,7 @@ export default function AdminPedidos() {
   async function cargar() {
     let q = supabase
       .from('pedidos')
-      .select('id, estado, cantidad, total, notas, origen, created_at, clientes(nombre,telefono,direccion,lat,lng,municipio,colonia), repartidores(nombre,lat,lng,ultima_ubicacion)')
+      .select('id, estado, cantidad, total, notas, origen, created_at, clientes(nombre,telefono,direccion,lat,lng,municipio,colonia,referencias), repartidores(nombre,lat,lng,ultima_ubicacion)')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -289,6 +289,9 @@ export default function AdminPedidos() {
                 )}
                 {p.origen === 'web' && p.clientes?.lat && !p.clientes?.colonia && (
                   <p className="text-xs text-gray-300 mt-0.5 italic">Sin colonia detectada</p>
+                )}
+                {p.clientes?.referencias && (
+                  <p className="text-xs text-amber-700 mt-0.5">📌 {p.clientes.referencias}</p>
                 )}
                 {p.repartidores && (
                   <p className="text-xs text-gray-500 mt-0.5">

@@ -1,6 +1,7 @@
 import { type NextRequest } from 'next/server'
 import { parsearComando, MENSAJE_AYUDA } from '@/lib/comandos'
 import { geocodificar } from '@/lib/geocoding'
+import { estaAbierto, horarioDeHoy, HORARIO_DEFAULT, type HorarioSemana } from '@/lib/horario'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const { data: cliente } = await supabaseAdmin
     .from('clientes')
-    .select('id, nombre, lat, lng, lat_pendiente, lng_pendiente, garrafones_prestados')
+    .select('id, nombre, lat, lng, lat_pendiente, lng_pendiente, garrafones_prestados, purificadora_id')
     .eq('telefono', telefono)
     .eq('activo', true)
     .maybeSingle()
@@ -130,6 +131,21 @@ export async function POST(request: NextRequest) {
       }
 
       case 'PEDIDO': {
+        // Verificar horario de atención usando purificadora_id del cliente
+        const puriId = (cliente as unknown as { purificadora_id?: string })?.purificadora_id
+        if (puriId) {
+          const { data: cfgHorarioWa } = await supabaseAdmin
+            .from('configuracion').select('valor').eq('clave', 'horario').eq('purificadora_id', puriId).maybeSingle()
+          const horarioWa = (cfgHorarioWa?.valor as HorarioSemana | null) ?? HORARIO_DEFAULT
+          if (!estaAbierto(horarioWa)) {
+            const hoy = horarioDeHoy(horarioWa)
+            respuesta = hoy
+              ? `⏰ Estamos cerrados en este momento.\n\nHorario de hoy: *${hoy.inicio}–${hoy.fin}*\nIntenta de nuevo en ese horario.`
+              : `⏰ No tenemos servicio hoy. Por favor intenta mañana.`
+            break
+          }
+        }
+
         const { data: pedidoActivo } = await supabaseAdmin
           .from('pedidos')
           .select('id')
@@ -168,10 +184,13 @@ export async function POST(request: NextRequest) {
           respuesta = `No se pudo crear tu pedido. Intenta de nuevo en un momento.`
         } else {
           pedidoId  = pedido.id
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+          const urlSeguimiento = appUrl ? `\n\n📍 Sigue tu pedido en tiempo real:\n${appUrl}/seguimiento/${pedido.id}` : ''
           respuesta =
             `✅ Pedido recibido:\n` +
             `🫙 ${cantidad} garrafón${cantidad > 1 ? 'es' : ''} × $${precio} = *$${total}*\n\n` +
-            `Te avisaremos cuando el repartidor esté en camino 🚚`
+            `Te avisaremos cuando el repartidor esté en camino 🚚` +
+            urlSeguimiento
 
           // Notificar a todos los repartidores activos
           fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/push/send`, {

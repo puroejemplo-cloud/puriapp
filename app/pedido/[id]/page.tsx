@@ -21,9 +21,10 @@ function normalizarTelefono(tel: string): string {
 }
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
-type ZonaConfig = { lat: number; lng: number; radio_km: number } | null
-type EstadoGPS  = 'idle' | 'obteniendo' | 'ok' | 'fuera' | 'error'
-type PedidoOk   = { pedidoId: string; total: number; precio: number; cantidad: number; nombre: string }
+type ZonaConfig   = { lat: number; lng: number; radio_km: number } | null
+type EstadoGPS    = 'idle' | 'obteniendo' | 'ok' | 'fuera' | 'error'
+type HorarioHoy   = { inicio: string; fin: string } | null
+type PedidoOk     = { pedidoId: string; total: number; precio: number; cantidad: number; nombre: string }
 
 // ── Componente ─────────────────────────────────────────────────────────────
 export default function PedidoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,13 +36,16 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
   const [municipios,   setMunicipios]   = useState<string[]>([])
   const [cargando,     setCargando]     = useState(true)
   const [noDisponible, setNoDisponible] = useState(false)
+  const [abierto,      setAbierto]      = useState(true)
+  const [horarioHoy,   setHorarioHoy]   = useState<HorarioHoy>(null)
 
   // Formulario
-  const [nombre,    setNombre]    = useState('')
-  const [telefono,  setTelefono]  = useState('')
-  const [direccion, setDireccion] = useState('')
-  const [municipio, setMunicipio] = useState('')
-  const [cantidad,  setCantidad]  = useState(1)
+  const [nombre,      setNombre]      = useState('')
+  const [telefono,    setTelefono]    = useState('')
+  const [direccion,   setDireccion]   = useState('')
+  const [municipio,   setMunicipio]   = useState('')
+  const [referencias, setReferencias] = useState('')
+  const [cantidad,    setCantidad]    = useState(1)
 
   // GPS
   const [lat,       setLat]       = useState<number | null>(null)
@@ -58,6 +62,7 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
     setNombre(leerCookie('ped_nombre'))
     setTelefono(leerCookie('ped_telefono'))
     setDireccion(leerCookie('ped_direccion'))
+    setReferencias(leerCookie('ped_referencias'))
 
     fetch(`/api/pedido/public?purificadoraId=${purificadoraId}`)
       .then(r => r.json())
@@ -65,8 +70,10 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
         if (d.error) { setNoDisponible(true); return }
         setNombrePuri(d.nombre ?? '')
         setLogoUrl(d.logoUrl ?? null)
-        if (d.zona)       setZona(d.zona)
+        if (d.zona)               setZona(d.zona)
         if (d.municipios?.length) setMunicipios(d.municipios)
+        setAbierto(d.abierto !== false)
+        setHorarioHoy(d.horarioHoy ?? null)
       })
       .catch(() => setNoDisponible(true))
       .finally(() => setCargando(false))
@@ -101,20 +108,22 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           purificadoraId,
-          telefono:  normalizarTelefono(telefono),
-          nombre:    nombre.trim(),
-          direccion: direccion.trim(),
-          municipio: municipio || null,
+          telefono:    normalizarTelefono(telefono),
+          nombre:      nombre.trim(),
+          direccion:   direccion.trim(),
+          municipio:   municipio || null,
+          referencias: referencias.trim() || null,
           cantidad,
-          lat:       coordLat,
-          lng:       coordLng,
+          lat:         coordLat,
+          lng:         coordLng,
         }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Error al enviar el pedido.'); return }
-      guardarCookie('ped_nombre',    nombre.trim())
-      guardarCookie('ped_telefono',  telefono)
-      guardarCookie('ped_direccion', direccion.trim())
+      guardarCookie('ped_nombre',      nombre.trim())
+      guardarCookie('ped_telefono',    telefono)
+      guardarCookie('ped_direccion',   direccion.trim())
+      guardarCookie('ped_referencias', referencias.trim())
       setPedidoOk({ ...data, cantidad, nombre: nombre.trim() })
     } catch {
       setError('Error de conexión. Verifica tu internet.')
@@ -192,13 +201,19 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
         <p className="text-gray-500 text-sm mb-5">
           Gracias, <strong>{pedidoOk.nombre}</strong>. Te avisaremos cuando el repartidor esté en camino.
         </p>
-        <div className="bg-sky-50 rounded-xl p-4 text-left text-sm space-y-1 mb-6">
+        <div className="bg-sky-50 rounded-xl p-4 text-left text-sm space-y-1 mb-4">
           <p className="text-gray-600">🫙 {pedidoOk.cantidad} garrafón{pedidoOk.cantidad > 1 ? 'es' : ''} × ${pedidoOk.precio}</p>
           <p className="font-semibold text-gray-800">Total: ${pedidoOk.total}</p>
         </div>
+        <a
+          href={`/seguimiento/${pedidoOk.pedidoId}`}
+          className="block w-full py-3 rounded-xl bg-sky-500 text-white text-sm font-semibold hover:bg-sky-600 transition mb-3"
+        >
+          📍 Ver estado de mi pedido
+        </a>
         <button
           onClick={() => { setPedidoOk(null); setEstadoGPS('idle'); setLat(null); setLng(null) }}
-          className="w-full py-3 rounded-xl bg-sky-500 text-white text-sm font-semibold hover:bg-sky-600 transition"
+          className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200 transition"
         >
           Hacer otro pedido
         </button>
@@ -223,6 +238,17 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
           <p className="text-gray-400 text-xs mt-0.5">Entrega a domicilio</p>
         </div>
 
+        {/* Banner cerrado */}
+        {!abierto && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center mb-2">
+            <p className="text-amber-800 font-semibold text-sm">⏰ Estamos cerrados en este momento</p>
+            {horarioHoy
+              ? <p className="text-amber-600 text-xs mt-1">Horario de hoy: {horarioHoy.inicio}–{horarioHoy.fin}</p>
+              : <p className="text-amber-600 text-xs mt-1">Hoy no tenemos servicio. Vuelve mañana.</p>
+            }
+          </div>
+        )}
+
         <form onSubmit={enviar} className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
 
           <div>
@@ -245,6 +271,15 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
             <textarea value={direccion} onChange={e => setDireccion(e.target.value)}
               placeholder="Calle, número" required rows={2}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Referencias <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <input type="text" value={referencias} onChange={e => setReferencias(e.target.value)}
+              placeholder="Ej: 2do piso, portón azul, junto a la farmacia"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" />
           </div>
 
           {municipios.length > 0 && (
@@ -296,9 +331,9 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
             </div>
           )}
 
-          <button type="submit" disabled={enviando || estadoGPS === 'fuera'}
+          <button type="submit" disabled={enviando || estadoGPS === 'fuera' || !abierto}
             className="w-full py-3.5 rounded-xl bg-sky-500 text-white font-semibold text-sm hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed transition">
-            {enviando ? 'Enviando pedido…' : `🫙 Pedir ${cantidad} garrafón${cantidad > 1 ? 'es' : ''}`}
+            {enviando ? 'Enviando pedido…' : !abierto ? '⏰ Cerrado por ahora' : `🫙 Pedir ${cantidad} garrafón${cantidad > 1 ? 'es' : ''}`}
           </button>
         </form>
 

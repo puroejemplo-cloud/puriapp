@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { geocodificar, reverseGeocode } from '@/lib/geocoding'
 import { distanciaKm } from '@/lib/distancia'
+import { estaAbierto, horarioDeHoy, HORARIO_DEFAULT, type HorarioSemana } from '@/lib/horario'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,23 +18,27 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdmin()
 
-  const [{ data: puri }, { data: cfgZona }, { data: cfgMunis }, { data: cfgLogo }] = await Promise.all([
+  const [{ data: puri }, { data: cfgZona }, { data: cfgMunis }, { data: cfgLogo }, { data: cfgHorario }] = await Promise.all([
     supabase.from('purificadoras').select('nombre, activo').eq('id', purificadoraId).single(),
     supabase.from('configuracion').select('valor').eq('clave', 'geocoding_zona').eq('purificadora_id', purificadoraId).maybeSingle(),
     supabase.from('configuracion').select('valor').eq('clave', 'municipios').eq('purificadora_id', purificadoraId).maybeSingle(),
     supabase.from('configuracion').select('valor').eq('clave', 'logo_url').eq('purificadora_id', purificadoraId).maybeSingle(),
+    supabase.from('configuracion').select('valor').eq('clave', 'horario').eq('purificadora_id', purificadoraId).maybeSingle(),
   ])
 
   if (!puri || !puri.activo) {
     return NextResponse.json({ error: 'Purificadora no disponible' }, { status: 404 })
   }
 
+  const horario = (cfgHorario?.valor as HorarioSemana | null) ?? HORARIO_DEFAULT
   const z = cfgZona?.valor
   return NextResponse.json({
-    nombre:     puri.nombre,
-    zona:       (z?.lat && z?.lng) ? { lat: z.lat, lng: z.lng, radio_km: z.radio_km ?? 10 } : null,
-    municipios: (cfgMunis?.valor as string[] | null) ?? [],
-    logoUrl:    (cfgLogo?.valor as string | null) ?? null,
+    nombre:      puri.nombre,
+    zona:        (z?.lat && z?.lng) ? { lat: z.lat, lng: z.lng, radio_km: z.radio_km ?? 10 } : null,
+    municipios:  (cfgMunis?.valor as string[] | null) ?? [],
+    logoUrl:     (cfgLogo?.valor as string | null) ?? null,
+    abierto:     estaAbierto(horario),
+    horarioHoy:  horarioDeHoy(horario),
   })
 }
 
@@ -42,7 +47,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Datos inválidos.' }, { status: 400 })
 
-  const { purificadoraId, telefono, nombre, direccion, municipio, cantidad, lat: latCliente, lng: lngCliente } = body
+  const { purificadoraId, telefono, nombre, direccion, municipio, referencias, cantidad, lat: latCliente, lng: lngCliente } = body
 
   if (!purificadoraId || !telefono || !nombre || !direccion || !cantidad) {
     return NextResponse.json({ error: 'Faltan datos requeridos.' }, { status: 400 })
@@ -58,6 +63,18 @@ export async function POST(request: NextRequest) {
     .from('purificadoras').select('activo').eq('id', purificadoraId).single()
   if (!puri?.activo) {
     return NextResponse.json({ error: 'Purificadora no disponible.' }, { status: 404 })
+  }
+
+  // Verificar horario de atención
+  const { data: cfgHorarioPost } = await supabase
+    .from('configuracion').select('valor').eq('clave', 'horario').eq('purificadora_id', purificadoraId).maybeSingle()
+  const horarioPost = (cfgHorarioPost?.valor as HorarioSemana | null) ?? HORARIO_DEFAULT
+  if (!estaAbierto(horarioPost)) {
+    const hoy = horarioDeHoy(horarioPost)
+    const msg = hoy
+      ? `Estamos cerrados en este momento. Nuestro horario de hoy es ${hoy.inicio}–${hoy.fin}.`
+      : 'No tenemos servicio hoy. Consulta nuestro horario de atención.'
+    return NextResponse.json({ error: msg }, { status: 422 })
   }
 
   // Zona de entrega de esta purificadora
@@ -108,9 +125,10 @@ export async function POST(request: NextRequest) {
     await supabase.from('clientes').update({
       nombre:    nombre.trim(),
       direccion: direccion.trim(),
-      ...(municipio  ? { municipio }          : {}),
-      ...(coloniaGeo ? { colonia: coloniaGeo } : {}),
-      ...(lat && lng ? { lat, lng }            : {}),
+      ...(municipio          ? { municipio }                    : {}),
+      ...(coloniaGeo         ? { colonia: coloniaGeo }          : {}),
+      ...(lat && lng         ? { lat, lng }                     : {}),
+      ...(referencias?.trim() ? { referencias: referencias.trim() } : {}),
     }).eq('id', clienteExistente.id)
     clienteId = clienteExistente.id
   } else {
@@ -120,6 +138,7 @@ export async function POST(request: NextRequest) {
         telefono: tel, nombre: nombre.trim(), direccion: direccion.trim(),
         municipio: municipio ?? null, colonia: coloniaGeo,
         lat, lng, purificadora_id: purificadoraId,
+        referencias: referencias?.trim() || null,
       })
       .select('id').single()
     if (error || !nuevo) {
