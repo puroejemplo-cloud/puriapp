@@ -34,6 +34,8 @@ export default function LoginPage() {
         router.push('/superadmin')
       } else if (role === 'admin') {
         router.push('/admin')
+      } else if (role === 'relleno') {
+        router.push('/relleno')
       } else {
         router.push('/repartidor')
       }
