@@ -206,10 +206,43 @@ export default function RepartidorPage() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'pedidos' },
           async payload => {
-            await cargarPedidos()
+            // DELETE — quitar de la lista inmediatamente
+            if (payload.eventType === 'DELETE') {
+              setPedidos(prev => prev.filter(p => p.id !== (payload.old as { id: string }).id))
+              return
+            }
+
+            const nuevo = payload.new as { id: string; estado: string }
+
+            // Entregado o cancelado — quitar de la lista inmediatamente
+            if (nuevo.estado === 'entregado' || nuevo.estado === 'cancelado') {
+              setPedidos(prev => prev.filter(p => p.id !== nuevo.id))
+              return
+            }
+
+            // INSERT o UPDATE relevante — buscar solo ese pedido con sus joins
+            const { data } = await supabase
+              .from('pedidos')
+              .select(`id, estado, cantidad, total, notas, repartidor_id, created_at,
+                clientes (nombre, direccion, colonia, municipio, lat, lng, telefono, referencias)`)
+              .eq('id', nuevo.id)
+              .single()
+
+            if (!data) return
+
+            setPedidos(prev => {
+              const idx = prev.findIndex(p => p.id === data.id)
+              if (idx >= 0) {
+                const next = [...prev]
+                next[idx] = data as unknown as Pedido
+                return next
+              }
+              return [...prev, data as unknown as Pedido]
+            })
+
             if (payload.eventType === 'INSERT') {
               navigator.vibrate?.([300, 150, 300])
-              setNuevoPedidoId((payload.new as Pedido).id)
+              setNuevoPedidoId(data.id)
               setTimeout(() => setNuevoPedidoId(null), 4000)
               try { await new Audio('/gota.mp3').play() } catch { /* opcional */ }
             }

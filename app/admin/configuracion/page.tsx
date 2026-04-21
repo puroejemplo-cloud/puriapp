@@ -577,6 +577,49 @@ export default function AdminConfiguracion() {
           {guardandoHorario ? 'Guardando...' : 'Guardar horario'}
         </button>
       </div>
+
+      {/* Backfill colonia/municipio */}
+      <BackfillGeo />
+    </div>
+  )
+}
+
+function BackfillGeo() {
+  const supabase = useMemo(() => crearClienteBrowser(), [])
+  const [estado, setEstado] = useState<'idle' | 'cargando' | 'ok' | 'error'>('idle')
+  const [msg,    setMsg]    = useState('')
+
+  async function ejecutar() {
+    setEstado('cargando')
+    setMsg('')
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/backfill-geo', {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+    })
+    const json = await res.json()
+    if (!res.ok) { setEstado('error'); setMsg(json.error ?? 'Error'); return }
+    setEstado('ok')
+    setMsg(`✅ ${json.actualizados} de ${json.total} clientes actualizados`)
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+      <div>
+        <h2 className="text-base font-bold text-gray-800">Rellenar colonia y municipio</h2>
+        <p className="text-xs text-gray-400 mt-0.5">
+          Detecta colonia y municipio para todos los clientes que tienen GPS pero aún no tienen esos datos.
+          Tarda ~1 segundo por cliente (límite Nominatim).
+        </p>
+      </div>
+      {msg && <p className="text-sm text-gray-600">{msg}</p>}
+      <button
+        onClick={ejecutar}
+        disabled={estado === 'cargando'}
+        className="w-full bg-gray-700 hover:bg-gray-800 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm"
+      >
+        {estado === 'cargando' ? 'Procesando clientes... (puede tardar)' : 'Ejecutar detección'}
+      </button>
     </div>
   )
 }
