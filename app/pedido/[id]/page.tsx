@@ -348,7 +348,7 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
             <div className="text-3xl text-center mb-3">📍</div>
             <h3 className="text-lg font-bold text-gray-800 text-center mb-2">
-              ¿Compartir tu ubicación?
+              ¿Compartir tu dirección?
             </h3>
             <p className="text-sm text-gray-500 text-center mb-6">
               Nos ayuda a encontrarte más rápido y confirmar que estás dentro de nuestra zona de entrega.

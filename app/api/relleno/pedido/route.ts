@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     .from('pedidos')
     .select(`
       id, estado, cantidad, total, notas, origen, created_at,
-      clientes(nombre, telefono, direccion),
+      clientes(nombre, telefono, direccion, colonia, municipio, lat, lng),
       repartidores(nombre)
     `)
     .eq('purificadora_id', purificadoraId)

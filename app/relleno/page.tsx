@@ -31,7 +31,7 @@ type Pedido = {
   notas:       string | null
   origen:      string | null
   created_at:  string
-  clientes:    { nombre: string; telefono: string; direccion: string } | null
+  clientes:    { nombre: string; telefono: string; direccion: string; colonia: string | null; municipio: string | null; lat: number | null; lng: number | null } | null
   repartidores: { nombre: string } | null
 }
 
@@ -517,8 +517,16 @@ export default function RellenoPage() {
                             <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">
                               {p.origen ? (ORIGEN_LABEL[p.origen] ?? p.origen) : 'WhatsApp'}
                             </span>
+                            {p.clientes?.lat && p.clientes?.lng && (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">📍 GPS</span>
+                            )}
                           </div>
                           <p className="text-xs text-gray-500 mt-0.5 truncate">{p.clientes?.direccion}</p>
+                          {(p.clientes?.colonia || p.clientes?.municipio) && (
+                            <p className="text-xs text-gray-400 truncate">
+                              {[p.clientes.colonia, p.clientes.municipio].filter(Boolean).join(', ')}
+                            </p>
+                          )}
                           <p className="text-xs text-gray-400">{p.clientes?.telefono}</p>
                           {p.notas && <p className="text-xs text-gray-400 italic mt-0.5">{p.notas}</p>}
                         </div>
@@ -560,6 +568,11 @@ export default function RellenoPage() {
                         <div className="min-w-0">
                           <span className="text-sm font-bold text-gray-800">{p.clientes?.nombre ?? 'Cliente'}</span>
                           <p className="text-xs text-gray-500 truncate">{p.clientes?.direccion}</p>
+                          {(p.clientes?.colonia || p.clientes?.municipio) && (
+                            <p className="text-xs text-gray-400 truncate">
+                              {[p.clientes.colonia, p.clientes.municipio].filter(Boolean).join(', ')}
+                            </p>
+                          )}
                           {p.repartidores && (
                             <p className="text-xs text-blue-500 mt-0.5">🚚 {p.repartidores.nombre}</p>
                           )}
