@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
     .eq('id', purificadoraId)
     .maybeSingle()
 
-  const slugPuri = slugify(purificadora?.nombre ?? 'purificadora')
+  const slugPuri   = slugify(purificadora?.nombre ?? 'purificadora')
   const slugNombre = slugify(nombre.trim())
-  const email = `${slugPuri}+${slugNombre}@purificadora.com`
+  const email = `${slugPuri}+${slugNombre}@${slugPuri}.com`
   const password = generarPassword()
 
   // Crear usuario en Supabase Auth

@@ -8,6 +8,7 @@ type Operador = {
   nombre:  string
   activo:  boolean
   user_id: string | null
+  email?:  string | null
 }
 
 type Credenciales = { email: string; password: string }
@@ -28,14 +29,17 @@ type TurnoResumen = {
 export default function AdminRellenoPage() {
   const supabase = useMemo(() => crearClienteBrowser(), [])
 
-  const [operadores,   setOperadores]   = useState<Operador[]>([])
-  const [credenciales, setCredenciales] = useState<Credenciales | null>(null)
-  const [nombre,       setNombre]       = useState('')
-  const [guardando,    setGuardando]    = useState(false)
-  const [error,        setError]        = useState('')
-  const [mostrarForm,  setMostrarForm]  = useState(false)
-  const [turnos,       setTurnos]       = useState<TurnoResumen[]>([])
+  const [operadores,     setOperadores]     = useState<Operador[]>([])
+  const [credenciales,   setCredenciales]   = useState<Credenciales | null>(null)
+  const [nombre,         setNombre]         = useState('')
+  const [guardando,      setGuardando]      = useState(false)
+  const [error,          setError]          = useState('')
+  const [mostrarForm,    setMostrarForm]     = useState(false)
+  const [turnos,         setTurnos]         = useState<TurnoResumen[]>([])
   const [cargandoTurnos, setCargandoTurnos] = useState(true)
+  const [modalOp,        setModalOp]        = useState<Operador | null>(null)
+  const [cambiando,      setCambiando]      = useState(false)
+  const [nuevaCred,      setNuevaCred]      = useState<Credenciales | null>(null)
 
   async function getToken() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -47,7 +51,39 @@ export default function AdminRellenoPage() {
     const res = await fetch('/api/admin/relleno', {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (res.ok) setOperadores(await res.json())
+    if (!res.ok) return
+    const data: Operador[] = await res.json()
+    if (!data.length) { setOperadores([]); return }
+
+    const userIds = data.filter(o => o.user_id).map(o => o.user_id!)
+    let emailMap: Record<string, string> = {}
+    if (userIds.length) {
+      const r2 = await fetch('/api/admin/usuario', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ userIds }),
+      })
+      if (r2.ok) {
+        const lista: { id: string; email: string }[] = await r2.json()
+        emailMap = Object.fromEntries(lista.map(u => [u.id, u.email]))
+      }
+    }
+    setOperadores(data.map(o => ({ ...o, email: o.user_id ? emailMap[o.user_id] ?? null : null })))
+  }
+
+  async function cambiarPassword() {
+    if (!modalOp?.user_id) return
+    setCambiando(true)
+    const token = await getToken()
+    const res = await fetch('/api/admin/usuario', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body:    JSON.stringify({ userId: modalOp.user_id }),
+    })
+    const json = await res.json()
+    setCambiando(false)
+    if (!res.ok) { setError(json.error ?? 'Error'); return }
+    setNuevaCred({ email: json.email, password: json.password })
   }
 
   async function cargarTurnos() {
@@ -186,28 +222,39 @@ export default function AdminRellenoPage() {
             <p className="text-gray-400 text-sm text-center py-6">Sin operadores registrados</p>
           )}
           {operadores.map(op => (
-            <div key={op.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center justify-between gap-2 ${
+            <div key={op.id} className={`bg-white rounded-2xl border shadow-sm p-4 ${
               op.activo ? 'border-gray-100' : 'border-gray-100 opacity-50'
             }`}>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-800">{op.nombre}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    op.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {op.activo ? 'Activo' : 'Inactivo'}
-                  </span>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-gray-800">{op.nombre}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      op.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {op.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                  {op.email
+                    ? <p className="text-xs font-mono text-gray-500 mt-0.5 truncate">{op.email}</p>
+                    : <p className="text-xs text-orange-500 mt-0.5">⚠️ Sin cuenta vinculada</p>
+                  }
                 </div>
-                {!op.user_id && <p className="text-xs text-orange-500 mt-0.5">⚠️ Sin cuenta vinculada</p>}
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <button onClick={() => toggleActivo(op)}
+                    className={`text-xs px-3 py-1.5 rounded-lg ${
+                      op.activo ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'
+                    }`}>
+                    {op.activo ? 'Desactivar' : 'Activar'}
+                  </button>
+                  {op.user_id && (
+                    <button onClick={() => { setModalOp(op); setNuevaCred(null); setError('') }}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600">
+                      🔑 Contraseña
+                    </button>
+                  )}
+                </div>
               </div>
-              <button
-                onClick={() => toggleActivo(op)}
-                className={`text-xs px-3 py-1.5 rounded-lg shrink-0 ${
-                  op.activo ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'
-                }`}
-              >
-                {op.activo ? 'Desactivar' : 'Activar'}
-              </button>
             </div>
           ))}
         </div>
@@ -253,6 +300,69 @@ export default function AdminRellenoPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Modal cambiar contraseña */}
+      {modalOp && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 space-y-4">
+            <div>
+              <h2 className="text-base font-bold text-gray-800">Credenciales — {modalOp.nombre}</h2>
+              {modalOp.email && (
+                <p className="text-sm font-mono text-gray-500 mt-1 break-all">{modalOp.email}</p>
+              )}
+            </div>
+            {nuevaCred ? (
+              <CuadroCredenciales cred={nuevaCred} onCerrar={() => { setNuevaCred(null); setModalOp(null) }} />
+            ) : (
+              <>
+                <p className="text-sm text-gray-500">
+                  Se generará una nueva contraseña aleatoria. La contraseña anterior dejará de funcionar.
+                </p>
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+                <div className="flex gap-2">
+                  <button onClick={() => setModalOp(null)}
+                    className="flex-1 border border-gray-200 text-gray-500 rounded-2xl py-3 text-sm font-medium">
+                    Cancelar
+                  </button>
+                  <button onClick={cambiarPassword} disabled={cambiando}
+                    className="flex-1 bg-sky-500 disabled:opacity-50 text-white rounded-2xl py-3 font-bold text-sm">
+                    {cambiando ? 'Generando...' : 'Nueva contraseña'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CuadroCredenciales({ cred, onCerrar }: { cred: { email: string; password: string }; onCerrar: () => void }) {
+  const [copiado, setCopiado] = useState(false)
+
+  function copiar() {
+    navigator.clipboard.writeText(`Email: ${cred.email}\nContraseña: ${cred.password}`)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2000)
+  }
+
+  return (
+    <div className="bg-green-50 border border-green-200 rounded-2xl p-4 space-y-2">
+      <p className="text-sm font-bold text-green-800">✅ Credenciales listas — compártelas:</p>
+      <div className="bg-white rounded-xl border border-green-100 p-3 space-y-1 font-mono text-sm">
+        <p><span className="text-gray-400 text-xs">Email:</span><br /><strong>{cred.email}</strong></p>
+        <p className="mt-1"><span className="text-gray-400 text-xs">Contraseña:</span><br /><strong>{cred.password}</strong></p>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={copiar}
+          className={`flex-1 text-xs font-medium py-2 rounded-xl transition ${
+            copiado ? 'bg-green-200 text-green-800' : 'bg-green-100 text-green-700'
+          }`}>
+          {copiado ? '✓ Copiado' : 'Copiar todo'}
+        </button>
+        <button onClick={onCerrar} className="text-xs text-green-600 underline px-2">Cerrar</button>
       </div>
     </div>
   )

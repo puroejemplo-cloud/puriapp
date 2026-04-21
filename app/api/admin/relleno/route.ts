@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
   const slugPuri   = slugify(purificadora?.nombre ?? 'purificadora')
   const slugNombre = slugify(nombre.trim())
-  const email      = `${slugPuri}+relleno${slugNombre}@purificadora.com`
+  const email      = `${slugPuri}+${slugNombre}@${slugPuri}.com`
   const password   = generarPassword()
 
   const { data: nuevoUsuario, error: errAuth } = await supabase.auth.admin.createUser({
