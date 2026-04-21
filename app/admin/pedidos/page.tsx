@@ -12,6 +12,7 @@ type Pedido = {
   cantidad:      number
   total:         number
   notas:         string | null
+  origen:        string | null
   created_at:    string
   clientes:      { nombre: string; telefono: string; direccion: string; lat: number | null; lng: number | null } | null
   repartidores:  { nombre: string; lat: number | null; lng: number | null; ultima_ubicacion: string | null } | null
@@ -76,7 +77,7 @@ export default function AdminPedidos() {
   async function cargar() {
     let q = supabase
       .from('pedidos')
-      .select('id, estado, cantidad, total, notas, created_at, clientes(nombre,telefono,direccion,lat,lng), repartidores(nombre,lat,lng,ultima_ubicacion)')
+      .select('id, estado, cantidad, total, notas, origen, created_at, clientes(nombre,telefono,direccion,lat,lng), repartidores(nombre,lat,lng,ultima_ubicacion)')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -127,8 +128,21 @@ export default function AdminPedidos() {
     await supabase.from('pedidos').update({ estado, ...extra }).eq('id', id)
   }
 
-  async function asignarRepartidor(id: string, repartidorId: string) {
-    await supabase.from('pedidos').update({ repartidor_id: repartidorId, estado: 'en_ruta' }).eq('id', id)
+  async function asignarRepartidor(pedido: Pedido, repartidorId: string) {
+    await supabase.from('pedidos').update({ repartidor_id: repartidorId, estado: 'en_ruta' }).eq('id', pedido.id)
+
+    // Notificar al repartidor asignado
+    const { data: { session } } = await supabase.auth.getSession()
+    fetch('/api/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+      body: JSON.stringify({
+        repartidorId,
+        titulo: '📦 Pedido asignado',
+        cuerpo: `${pedido.clientes?.nombre ?? 'Cliente'} — ${pedido.cantidad} garrafón${pedido.cantidad > 1 ? 'es' : ''}`,
+        url: '/repartidor',
+      }),
+    }).catch(() => {})
   }
 
   function setField<K extends keyof NuevoPedidoForm>(k: K, v: NuevoPedidoForm[K]) {
@@ -254,6 +268,11 @@ export default function AdminPedidos() {
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${COLOR_ESTADO[p.estado]}`}>
                     {ETIQUETA[p.estado]}
                   </span>
+                  {p.origen === 'web' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">
+                      🌐 Web
+                    </span>
+                  )}
                   <span className="text-sm font-bold text-gray-800">
                     {p.cantidad} garrafón{p.cantidad > 1 ? 'es' : ''} — ${p.total}
                   </span>
@@ -297,7 +316,7 @@ export default function AdminPedidos() {
                 {p.estado === 'pendiente' && (
                   <select
                     defaultValue=""
-                    onChange={e => e.target.value && asignarRepartidor(p.id, e.target.value)}
+                    onChange={e => e.target.value && asignarRepartidor(p, e.target.value)}
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
                   >
                     <option value="" disabled>Asignar repartidor…</option>

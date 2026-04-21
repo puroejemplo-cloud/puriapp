@@ -4,28 +4,38 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { crearClienteBrowser } from '@/lib/supabase-browser'
+import { activarPushAdmin, pushAdminActivo } from '@/lib/push-admin'
 
 const NAV = [
   { href: '/admin',              label: '📊 Resumen'       },
   { href: '/admin/pedidos',      label: '📦 Pedidos'       },
   { href: '/admin/clientes',     label: '👥 Clientes'      },
   { href: '/admin/ventas-ruta',  label: '🛣️ Ventas ruta'  },
-  { href: '/admin/repartidores',   label: '🚚 Repartidores'  },
-  { href: '/admin/ruta',            label: '🗺 Ruta'           },
-  { href: '/admin/contabilidad',   label: '💰 Contabilidad'   },
-  { href: '/admin/configuracion',  label: '⚙️ Config'        },
+  { href: '/admin/repartidores', label: '🚚 Repartidores'  },
+  { href: '/admin/ruta',         label: '🗺 Ruta'          },
+  { href: '/admin/contabilidad', label: '💰 Contabilidad'  },
+  { href: '/admin/configuracion',label: '⚙️ Config'        },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter()
   const pathname = usePathname()
   const supabase = useMemo(() => crearClienteBrowser(), [])
-  const [email, setEmail]         = useState('')
-  const [verificando, setVerificando] = useState(true)
+
+  const [email,          setEmail]          = useState('')
+  const [userId,         setUserId]         = useState('')
+  const [purificadoraId, setPurificadoraId] = useState('')
+  const [verificando,    setVerificando]    = useState(true)
+
+  // Push
+  const [pushActivo,    setPushActivo]    = useState(false)
+  const [activandoPush, setActivandoPush] = useState(false)
+
+  // Copiar URL
+  const [urlCopiada, setUrlCopiada] = useState(false)
 
   useEffect(() => {
     async function verificar() {
-      // Refrescar JWT para garantizar metadata actualizada
       await supabase.auth.refreshSession().catch(() => {})
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || user.user_metadata?.role !== 'admin') {
@@ -33,6 +43,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return
       }
       setEmail(user.email ?? 'Admin')
+      setUserId(user.id)
+      setPurificadoraId(user.user_metadata?.purificadora_id ?? '')
+      setPushActivo(pushAdminActivo())
       setVerificando(false)
     }
     verificar()
@@ -48,6 +61,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   async function salir() {
     await supabase.auth.signOut()
     router.replace('/login')
+  }
+
+  async function activarNotificaciones() {
+    if (!userId || !purificadoraId) return
+    setActivandoPush(true)
+    const resultado = await activarPushAdmin(userId, purificadoraId)
+    setActivandoPush(false)
+    if (resultado === 'ok') setPushActivo(true)
+    else if (resultado === 'permiso_denegado') alert('Permiso de notificaciones denegado. Actívalo en la configuración del navegador.')
+    else if (resultado === 'no_soportado') alert('Tu navegador no soporta notificaciones push.')
+  }
+
+  function copiarUrlPedidos() {
+    if (!purificadoraId) return
+    const url = `${window.location.origin}/pedido/${purificadoraId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setUrlCopiada(true)
+      setTimeout(() => setUrlCopiada(false), 2000)
+    })
   }
 
   if (verificando) {
@@ -67,8 +99,39 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="font-bold text-gray-800 text-sm">Purificadora Admin</span>
             <span className="text-xs text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">v1.3.0</span>
           </div>
-          <div className="flex items-center gap-3 text-sm text-gray-500">
-            <span className="hidden sm:inline">{email}</span>
+
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span className="hidden sm:inline text-xs">{email}</span>
+
+            {/* Botón copiar URL de pedidos */}
+            {purificadoraId && (
+              <button
+                onClick={copiarUrlPedidos}
+                title={`Copiar enlace: /pedido/${purificadoraId}`}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition font-medium ${
+                  urlCopiada
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-sky-50 text-sky-600 hover:bg-sky-100'
+                }`}
+              >
+                {urlCopiada ? '✅ Copiado' : '🔗 URL pedidos'}
+              </button>
+            )}
+
+            {/* Botón activar notificaciones push */}
+            <button
+              onClick={activarNotificaciones}
+              disabled={activandoPush || pushActivo}
+              title={pushActivo ? 'Notificaciones activas' : 'Activar notificaciones de nuevos pedidos'}
+              className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition font-medium ${
+                pushActivo
+                  ? 'bg-green-100 text-green-700 cursor-default'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {activandoPush ? '⏳' : pushActivo ? '🔔 Activo' : '🔕 Notifs'}
+            </button>
+
             <button onClick={salir} className="text-red-500 hover:underline text-sm">
               Salir
             </button>

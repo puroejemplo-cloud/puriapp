@@ -23,6 +23,7 @@ export default function AdminConfiguracion() {
   const [mensajePrecios, setMP]     = useState('')
 
   const [purificadoraId, setPurificadoraId] = useState<string | null>(null)
+  const [urlCopiada, setUrlCopiada]         = useState(false)
 
   useEffect(() => {
     async function cargar() {
@@ -114,12 +115,56 @@ export default function AdminConfiguracion() {
 
   const tieneZona = zona.lat !== null && zona.lng !== null
 
+  function copiarUrl() {
+    if (!purificadoraId) return
+    const url = `${window.location.origin}/pedido/${purificadoraId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setUrlCopiada(true)
+      setTimeout(() => setUrlCopiada(false), 2500)
+    })
+  }
+
   return (
     <div className="max-w-lg space-y-6">
       <div>
         <h1 className="text-xl font-bold text-gray-800 mb-1">Configuración</h1>
         <p className="text-sm text-gray-500">Ajustes generales del sistema</p>
       </div>
+
+      {/* ── ENLACE DE PEDIDOS WEB ──────────────────────────────────────── */}
+      {purificadoraId && (
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-5">
+          <h2 className="font-semibold text-sky-800 mb-1">🔗 Enlace de pedidos en línea</h2>
+          <p className="text-xs text-sky-600 mb-3">
+            Comparte este enlace con tus clientes para que hagan pedidos sin WhatsApp.
+          </p>
+          <div className="bg-white rounded-xl border border-sky-200 px-4 py-3 font-mono text-xs text-gray-700 break-all mb-3">
+            {typeof window !== 'undefined'
+              ? `${window.location.origin}/pedido/${purificadoraId}`
+              : `/pedido/${purificadoraId}`}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={copiarUrl}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${
+                urlCopiada
+                  ? 'bg-green-500 text-white'
+                  : 'bg-sky-500 hover:bg-sky-600 text-white'
+              }`}
+            >
+              {urlCopiada ? '✅ Enlace copiado' : '📋 Copiar enlace'}
+            </button>
+            <a
+              href={`/pedido/${purificadoraId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-sky-200 text-sky-600 hover:bg-sky-50 transition"
+            >
+              Abrir →
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* ── PRECIOS ─────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
