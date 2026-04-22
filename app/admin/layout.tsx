@@ -26,6 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [email,          setEmail]          = useState('')
   const [userId,         setUserId]         = useState('')
   const [purificadoraId, setPurificadoraId] = useState('')
+  const [nombrePuri,     setNombrePuri]     = useState('Admin')
   const [slugPuri,       setSlugPuri]       = useState<string | null>(null)
   const [logoUrl,        setLogoUrl]        = useState<string | null>(null)
   const [verificando,    setVerificando]    = useState(true)
@@ -55,10 +56,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (puriId) {
         const [{ data: cfgLogo }, { data: puriData }] = await Promise.all([
           supabase.from('configuracion').select('valor').eq('clave', 'logo_url').eq('purificadora_id', puriId).maybeSingle(),
-          supabase.from('purificadoras').select('slug').eq('id', puriId).single(),
+          supabase.from('purificadoras').select('nombre, slug').eq('id', puriId).single(),
         ])
         if (cfgLogo?.valor) setLogoUrl(cfgLogo.valor as string)
-        if (puriData?.slug) setSlugPuri(puriData.slug)
+        if (puriData?.nombre) setNombrePuri(puriData.nombre)
+        if (puriData?.slug)   setSlugPuri(puriData.slug)
       }
 
       setVerificando(false)
@@ -115,7 +117,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               ? <img src={logoUrl} alt="Logo" className="h-7 w-7 rounded-lg object-cover" />
               : <span className="text-xl">💧</span>
             }
-            <span className="font-bold text-gray-800 text-sm">Purificadora Admin</span>
+            <span className="font-bold text-gray-800 text-sm">{nombrePuri}</span>
             <span className="text-xs text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">v1.3.0</span>
           </div>
 
